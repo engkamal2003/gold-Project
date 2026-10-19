@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>حسابات عملاء محل الذهب</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-icon">◆</div><div><strong>ذهب | حسابات العملاء</strong><small>إدارة الأرصدة والحركات</small></div></div>
+    <nav>
+      <button class="nav-btn active" data-view="dashboard">▦ <span>لوحة التحكم</span></button>
+      <button class="nav-btn" data-view="customers">♙ <span>العملاء</span></button>
+      <button class="nav-btn" data-view="transaction" data-permission="transactions:create">＋ <span>تسجيل حركة</span></button>
+      <button class="nav-btn" data-view="gold-calculator">◈ <span>حاسبة البيع والشراء</span></button>
+      <button class="nav-btn" data-view="payment-accounts">▤ <span>حسابات التحويل</span></button>
+      <button class="nav-btn" data-view="staff-schedule">◷ <span>إجازات الموظفين</span></button>
+      <button class="nav-btn" data-view="ledger">☷ <span>كشف الحركات</span></button>
+      <button class="nav-btn" data-view="inventory" data-permission="inventory:view">▣ <span>المخزون</span></button>
+      <button class="nav-btn" data-view="price-history">⌁ <span>تاريخ أسعار الذهب</span></button>
+      <button class="nav-btn manager-only" data-view="analytics" hidden>▥ <span>مؤشرات المدير</span></button>
+      <button class="nav-btn manager-only" data-view="customers-analysis" hidden>♧ <span>تحليل العملاء</span></button>
+      <button class="nav-btn manager-only" data-view="profit" hidden>↗ <span>الربح الفعلي</span></button>
+      <button class="nav-btn" data-view="pieces" data-permission="inventory:view">◇ <span>القطع المسلسلة</span></button>
+      <button class="nav-btn manager-only" data-view="manufacturing" hidden>⚒ <span>طلبات التصنيع</span></button>
+      <button class="nav-btn manager-only" data-view="pledges" hidden>◈ <span>الرهونات والضمانات</span></button>
+      <button class="nav-btn manager-only" data-view="suppliers" hidden>▤ <span>الموردون والمشتريات</span></button>
+      <button class="nav-btn" data-view="cash-close" data-permission="vault:view">▣ <span>إقفال النقدية</span></button>
+      <button class="nav-btn" data-view="alerts">⚑ <span>مركز التنبيهات</span></button>
+      <button class="nav-btn manager-only" data-view="security" hidden>⌑ <span>الأمان والصلاحيات</span></button>
+      <button class="nav-btn" data-view="vault" data-permission="vault:view">◉ <span>مطابقة الخزنة</span></button>
+      <button class="nav-btn" data-view="reports" data-permission="reports:view">▤ <span>التقارير</span></button>
+      <button class="nav-btn" data-view="backup">⇩ <span>النسخ الاحتياطي</span></button>
+      <button class="nav-btn manager-only" data-view="users" hidden>♙ <span>المستخدمون</span></button>
+      <button class="nav-btn manager-only" data-view="audit" hidden>◷ <span>سجل التدقيق</span></button>
+      <button class="nav-btn manager-only" data-view="settings" hidden>⚙ <span>الإعدادات</span></button>
+    </nav>
+    <div class="sidebar-note">البيانات مشتركة عبر خادم المحل. استخدم النسخ الاحتياطي بانتظام.</div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar"><div><div class="eyebrow">نظام إدارة الحسابات</div><h1 id="page-title">لوحة التحكم</h1></div><div class="topbar-tools"><div class="today" id="today"></div><span id="current-user"></span><button id="change-password-btn" class="secondary">كلمة المرور</button><button id="logout-btn" class="secondary">تسجيل الخروج</button></div></header>
+
+    <section class="view active" id="view-dashboard">
+      <div class="welcome"><div><h2>مرحبًا بك</h2><p>تابع أرصدة العملاء المالية والذهبية من مكان واحد.</p></div><button class="primary" data-goto="transaction">＋ تسجيل حركة جديدة</button></div>
+      <div class="stats">
+        <article class="stat"><span class="stat-label">مبالغ مستحقة للعملاء</span><strong id="owed-customers">0.00 ج.م</strong><small>صافي الأرصدة المالية الموجبة</small></article>
+        <article class="stat"><span class="stat-label">ديون مستحقة للمحل</span><strong id="owed-shop">0.00 ج.م</strong><small>صافي الأرصدة المالية السالبة</small></article>
+        <article class="stat"><span class="stat-label">ذهب مستحق للعملاء</span><strong id="gold-customers">0.000 جم</strong><small>إجمالي الأرصدة الموجبة حسب العيار</small></article>
+        <article class="stat"><span class="stat-label">عدد العملاء</span><strong id="customer-count">0</strong><small>العملاء المسجلون</small></article>
+      </div>
+      <div class="panel gold-price-widget"><div class="panel-head"><div><h3>أسعار الذهب العالمية</h3><p>قيمة استرشادية بالجنيه المصري لكل جرام، قبل المصنعية والضرائب</p></div><button type="button" id="gold-price-refresh" class="secondary manager-only" hidden>تحديث الآن</button></div>
+        <div id="global-gold-prices" class="gold-price-grid"><article><span>عيار 24</span><strong id="gold-display-24">—</strong></article><article><span>عيار 21</span><strong id="gold-display-21">—</strong></article><article><span>عيار 18</span><strong id="gold-display-18">—</strong></article></div>
+        <div id="gold-price-status" class="gold-price-status" aria-live="polite">جارٍ جلب السعر العالمي…</div><small id="gold-price-credit" class="gold-price-credit"></small>
+      </div>
+      <div class="panel"><div class="panel-head"><div><h3>آخر الحركات</h3><p>أحدث العمليات المسجلة في النظام</p></div><button class="secondary" data-goto="ledger">عرض الكل</button></div>
+        <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>العميل</th><th>نوع الحركة</th><th>المبلغ</th><th>الذهب</th><th>الحالة</th></tr></thead><tbody id="recent-rows"></tbody></table></div>
+      </div>
+      <div class="notice"><strong>تنبيه:</strong> احفظ نسخة احتياطية من بيانات الخادم بانتظام، وتأكد من أن الوصول إلى النظام يقتصر على شبكة المحل.</div>
+    </section>
+
+    <section class="view" id="view-staff-schedule">
+      <div class="panel"><div class="panel-head"><div><h3>جدول الإجازات الأسبوعية</h3><p>المحل يعمل طوال أيام الأسبوع؛ حدّد أيام إجازة كل موظف، ويمكن اختيار أكثر من يوم.</p></div><span id="staff-schedule-status" class="muted"></span></div>
+        <div class="staff-coverage" id="staff-coverage"></div>
+        <div class="table-wrap"><table class="staff-schedule-table"><thead><tr><th>اسم الموظف</th><th>السبت</th><th>الأحد</th><th>الاثنين</th><th>الثلاثاء</th><th>الأربعاء</th><th>الخميس</th><th>الجمعة</th></tr></thead><tbody id="staff-schedule-rows"><tr><td colspan="8" class="empty">جارٍ تحميل الموظفين...</td></tr></tbody></table></div>
+        <div class="form-actions manager-only staff-schedule-actions"><button class="primary" id="staff-schedule-save" type="button">حفظ جدول الإجازات</button><button class="secondary" id="staff-schedule-cancel" type="button">تجاهل التعديلات</button></div>
+      </div>
+      <div class="notice"><strong>ملاحظة:</strong> الإجازات في هذا الجدول أسبوعية ومتكررة. ترك جميع الأيام بدون تحديد يعني أن الموظف يعمل طوال الأسبوع. الجدول لا يسجل إجازة طارئة أو إجازة بتاريخ محدد.</div>
+    </section>
+
+    <section class="view" id="view-payment-accounts">
+      <div class="welcome payment-accounts-welcome"><div><h2>بيانات التحويل للعملاء</h2><p>اختر الحساب الذي تريد إرساله للعميل أو اطبع ورقة بيانات التحويل.</p></div><button id="payment-print-all" class="primary" type="button">طباعة كل الحسابات النشطة</button></div>
+      <div class="panel manager-only" id="payment-account-editor">
+        <div class="panel-head"><div><h3 id="payment-form-title">إضافة طريقة دفع أو حساب بنكي</h3><p>تُشارك البيانات بين مستخدمي النظام، ويمكن للموظفين طباعتها للعميل.</p></div></div>
+        <form id="payment-account-form" class="form-grid" autocomplete="off">
+          <label>اسم طريقة الدفع / الحساب *<input id="payment-name" required maxlength="100" placeholder="مثال: تحويل البنك الأهلي"></label>
+          <label>اسم البنك أو مقدم الخدمة *<input id="payment-bank" required maxlength="100" placeholder="مثال: البنك الأهلي المصري"></label>
+          <label>رقم الحساب أو IBAN أو المحفظة *<input id="payment-number" required maxlength="80" dir="ltr" inputmode="text" placeholder="أدخل الرقم كما يظهر للعميل"></label>
+          <label>اسم صاحب الحساب / المستفيد<input id="payment-beneficiary" maxlength="100" placeholder="الاسم المطلوب عند التحويل"></label>
+          <label class="span-2">تعليمات للعميل<input id="payment-notes" maxlength="250" placeholder="مثال: اكتب اسمك ورقم الفاتورة في سبب التحويل"></label>
+          <div class="span-2 form-actions"><button class="primary" id="payment-save-btn" type="submit">إضافة الحساب</button><button class="secondary" id="payment-cancel-edit" type="button" hidden>إلغاء التعديل</button></div>
+        </form>
+      </div>
+      <div class="panel"><div class="panel-head"><div><h3>طرق الدفع والحسابات البنكية</h3><p>تظهر الحسابات النشطة للموظفين، ويمكن طباعة بيانات أي حساب مباشرة.</p></div><span id="payment-account-count" class="muted"></span></div>
+        <div id="payment-account-list" class="payment-account-grid"><div class="empty">لا توجد حسابات مضافة حتى الآن.</div></div>
+      </div>
+      <div class="notice"><strong>للطباعة:</strong> استخدم زر «طباعة بيانات التحويل» بجانب الحساب المطلوب، أو اطبع جميع الحسابات النشطة في ورقة واحدة. لا تُسجل الطباعة حركة مالية؛ تُسجّل الحركة بعد تأكيد التحويل وإدخالها في النظام.</div>
+    </section>
+
+    <section class="view" id="view-gold-calculator">
+      <div class="panel gold-calculator-prices"><div class="panel-head"><div><h3>حاسبة أسعار الذهب والمشغولات</h3><p>أسعار العيارات الحالية المشتركة بين مستخدمي النظام</p></div><span id="calc-price-status" class="gold-price-status"></span></div>
+        <div class="gold-price-grid"><article><span>عيار 24</span><strong id="calc-price-24">—</strong></article><article><span>عيار 21</span><strong id="calc-price-21">—</strong></article><article><span>عيار 18</span><strong id="calc-price-18">—</strong></article></div>
+      </div>
+      <div class="panel"><div class="panel-head"><div><h3>بيانات الصنف</h3><p>اختر البيع أو الشراء من العميل؛ تتغير الحسبة تلقائيًا حسب نوع الصنف والعيار.</p></div></div>
+        <form id="gold-calc-form" class="form-grid" autocomplete="off">
+          <label>نوع العملية<select id="calc-operation"><option value="sell">بيع للعميل</option><option value="buy">شراء من العميل</option></select></label>
+          <label>الصنف<select id="calc-product"></select></label>
+          <label class="span-2">ربط بصنف مخزون (اختياري للبيع أو الشراء)<select id="calc-inventory-item"><option value="">بدون ربط بالمخزون</option></select><small>البيع يخصم الكمية، والشراء يضيف دفعة تكلفة جديدة وفق FIFO.</small></label>
+          <label class="span-2">ربط بقطعة ذات رقم تسلسلي (اختياري للبيع)<select id="calc-serial-piece"><option value="">بدون ربط بقطعة مسلسلة</option></select><small>يحدّث حالة القطعة ويربطها بالفاتورة تلقائيًا.</small></label>
+          <label id="calc-custom-name-label" hidden>اسم الصنف<input id="calc-custom-name" maxlength="100" placeholder="مثال: قطعة ذهب مخصصة"></label>
+          <label>العيار<select id="calc-karat"><option value="24">24</option><option value="21" selected>21</option><option value="18">18</option></select></label>
+          <label>وزن القطعة الواحدة (جرام)<input id="calc-weight" type="number" min="0.001" step="0.001" inputmode="decimal" required></label>
+          <label>العدد<input id="calc-quantity" type="number" min="1" step="1" value="1" inputmode="numeric" required></label>
+          <label id="calc-making-label">مصنعية الجرام (ج.م)<input id="calc-making" type="number" min="0" step="0.01" value="0" inputmode="decimal"></label>
+          <label id="calc-stamp-label">دمغة الجرام (ج.م)<input id="calc-stamp" type="number" min="0" step="0.01" value="0" inputmode="decimal"></label>
+          <div class="span-2 calc-preview" id="calc-preview" aria-live="polite"></div>
+          <div class="span-2 form-actions"><button class="primary" type="submit">إضافة إلى الفاتورة التقديرية</button><button class="secondary" id="calc-clear" type="button">فاتورة جديدة</button></div>
+        </form>
+      </div>
+      <div class="panel"><div class="panel-head"><div><h3>الفاتورة التقديرية</h3><p>سعر العيار يثبت وقت إضافة الصنف. راجع الأسعار والإعدادات قبل اعتماد البيع أو الشراء.</p></div><div class="form-actions"><button id="calc-print" class="secondary" type="button" disabled>طباعة عرض السعر</button><button id="calc-use-transaction" class="primary" type="button" disabled>نقل الإجمالي لتسجيل حركة</button></div></div>
+        <div class="table-wrap"><table class="calc-table"><thead><tr><th>الصنف</th><th>العيار</th><th>سعر الجرام</th><th>الوزن × العدد</th><th>المصنعية / الدمغة أو الخصم</th><th>الإجمالي</th><th>إجراء</th></tr></thead><tbody id="calc-lines"><tr><td colspan="7" class="empty">أضف صنفًا لبدء الفاتورة التقديرية.</td></tr></tbody></table></div>
+        <div class="calc-totals" id="calc-totals" hidden></div>
+        <small id="calc-transfer-note" class="gold-price-status" aria-live="polite"></small>
+      </div>
+      <div class="notice"><strong>طريقة الحساب:</strong> البيع للمشغولات = (سعر الجرام + المصنعية + الدمغة) × الوزن × العدد. البيع للسبائك والجنيهات لا يضيف دمغة. الشراء من العميل = (سعر الجرام − فرق الشراء + كاش باك السبيكة إن انطبق) × الوزن × العدد. الضريبة تُطبق في البيع فقط حسب إعداد المدير، وافتراضيًا صفر.</div>
+    </section>
+
+    <section class="view" id="view-customers">
+      <div class="panel">
+        <div class="panel-head"><div><h3>إضافة عميل</h3><p>أنشئ ملفًا مستقلًا لكل عميل</p></div></div>
+        <form id="customer-form" class="form-grid">
+          <label>اسم العميل *<input id="customer-name" required maxlength="100" placeholder="اسم العميل الكامل"></label>
+          <label>رقم الهاتف<input id="customer-phone" maxlength="30" placeholder="01xxxxxxxxx"></label>
+          <label class="span-2">ملاحظات<textarea id="customer-notes" rows="2" placeholder="ملاحظات اختيارية"></textarea></label>
+          <div class="span-2 form-actions"><button class="primary" type="submit">حفظ العميل</button></div>
+        </form>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div><h3>قائمة العملاء</h3><p>ابحث بالاسم أو رقم الهاتف</p></div><input id="customer-search" class="search" placeholder="بحث عن عميل..."></div>
+        <div class="table-wrap"><table><thead><tr><th>رقم العميل</th><th>الاسم</th><th>الهاتف</th><th>الرصيد المالي</th><th>رصيد الذهب</th><th>إجراء</th></tr></thead><tbody id="customer-rows"></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-transaction">
+      <div class="panel">
+        <div class="panel-head"><div><h3>تسجيل حركة جديدة</h3><p>اختر نوع العملية، وسيحسب النظام الرصيد المالي المتبقي للفاتورة عند الحاجة.</p></div></div>
+        <form id="transaction-form" class="form-grid">
+          <label>العميل *<select id="tx-customer" required><option value="">اختر العميل</option></select></label>
+          <label>تاريخ العملية *<input id="tx-date" type="datetime-local" required></label>
+          <label>نوع الحركة *
+            <select id="tx-type" required>
+              <option value="sell">بيع ذهب للعميل (دين على العميل عند عدم السداد)</option>
+              <option value="buy">شراء ذهب من العميل (مبلغ للعميل لدى المحل)</option>
+              <option value="payment">تحصيل مبلغ من العميل لسداد دين</option>
+              <option value="cash-deposit">إيداع مبلغ نقدي في حساب العميل</option>
+              <option value="cash-refund">رد مبلغ نقدي للعميل من رصيده</option>
+              <option value="gold-deposit">إضافة ذهب مستحق للعميل</option>
+              <option value="gold-delivery">تسليم ذهب من رصيد العميل</option>
+              <option value="opening-money">رصيد مالي افتتاحي</option>
+              <option value="opening-gold">رصيد ذهب افتتاحي</option>
+              <option value="adjustment">تسوية مالية (تحديد الإشارة)</option>
+            </select>
+          </label>
+          <label id="amount-label">قيمة الفاتورة / المبلغ (ج.م)<input id="tx-amount" type="number" min="0" step="0.01" value="0"></label>
+          <label id="paid-label">المبلغ المدفوع الآن (ج.م)<input id="tx-paid" type="number" min="0" step="0.01" value="0"></label>
+          <label id="tx-payment-method-label" hidden>طريقة دفع المبلغ<select id="tx-payment-method"><option value="cash">نقدًا</option><option value="bank">تحويل بنكي</option><option value="other">أخرى / آجل</option></select><small>يُستخدم هذا الاختيار عند حساب إقفال النقدية.</small></label>
+          <label id="gold-weight-label">وزن الذهب (جرام)<input id="tx-weight" type="number" min="0" step="0.0001" value="0"></label>
+          <label id="karat-label">عيار الذهب<select id="tx-karat"><option value="24">24</option><option value="22">22</option><option value="21" selected>21</option><option value="18">18</option><option value="14">14</option><option value="9">9</option></select></label>
+          <label id="direction-label">اتجاه التسوية المالية<select id="tx-direction"><option value="plus">لصالح العميل (+)</option><option value="minus">لصالح المحل (−)</option></select></label>
+          <label class="span-2">وصف / مرجع الفاتورة<input id="tx-notes" maxlength="250" placeholder="رقم الفاتورة أو تفاصيل العملية"></label>
+          <div class="span-2 preview" id="tx-preview"><span id="tx-preview-text">المتبقي من الفاتورة: 0.00 ج.م</span><button id="use-estimate-btn" class="small-btn" type="button" hidden>استخدام التقدير</button></div>
+          <div class="span-2 form-actions"><button class="primary" type="submit">حفظ الحركة</button><button class="secondary" type="reset">مسح الحقول</button></div>
+        </form>
+      </div>
+      <div class="notice"><strong>طريقة الحساب:</strong> الرصيد المالي الموجب يعني أن المحل مدين للعميل، والسالب يعني أن العميل مدين للمحل. رصيد الذهب منفصل لكل عيار. البيع والشراء لا يغيران رصيد الذهب المستحق تلقائيًا؛ يتم تسجيل وزن الذهب في الفاتورة فقط، بينما حركات رصيد الذهب تستخدم «إضافة ذهب» و«تسليم ذهب».</div>
+    </section>
+
+    <section class="view" id="view-ledger">
+      <div class="panel">
+        <div class="panel-head"><div><h3>كشف الحركات</h3><p>عرض الحركات مع اسم الموظف، والطباعة أو البحث والتصفية</p></div><div class="filters"><select id="ledger-customer"><option value="">كل العملاء</option></select><input id="ledger-search" placeholder="رقم أو وصف أو موظف"><input id="ledger-from" type="date" aria-label="من تاريخ"><input id="ledger-to" type="date" aria-label="إلى تاريخ"><button id="print-statement-btn" class="secondary">طباعة الكشف</button></div></div>
+        <div class="table-wrap"><table><thead><tr><th>رقم الحركة</th><th>التاريخ</th><th>العميل</th><th>نوع الحركة</th><th>التغير المالي</th><th>تغير الذهب</th><th>سجّلها / ألغاه</th><th>ملاحظات</th><th>إجراء</th></tr></thead><tbody id="ledger-rows"></tbody></table></div>
+      </div>
+    </section>
+    <section class="view" id="view-inventory">
+      <div class="panel" id="inventory-edit-panel"><div class="panel-head"><div><h3>إضافة صنف للمخزون</h3><p>سجّل القطع والأوزان والعيار والكمية المتاحة. إدارة المخزون مستقلة عن حساب العميل في هذه المرحلة.</p></div></div>
+        <form id="inventory-form" class="form-grid">
+          <label>اسم الصنف *<input id="item-name" required maxlength="100"></label><label>رمز الصنف<input id="item-sku" maxlength="40"></label>
+          <label>العيار *<select id="item-karat"><option>24</option><option>22</option><option selected>21</option><option>18</option><option>14</option><option>9</option></select></label>
+          <label>وزن القطعة (جرام) *<input id="item-weight" type="number" min="0.001" step="0.001" required></label>
+          <label>الكمية الأولية *<input id="item-quantity" type="number" min="0" step="1" value="0" required></label>
+          <label>حد التنبيه للكمية<input id="item-minimum" type="number" min="0" step="1" value="0"></label>
+          <label>تكلفة شراء القطعة (ج.م)<input id="item-unit-cost" type="number" min="0" step="0.01" inputmode="decimal"><small>سجّل تكلفة الاستلام لحساب الربح الفعلي.</small></label>
+          <label>تكلفة تصنيع القطعة (ج.م)<input id="item-unit-making-cost" type="number" min="0" step="0.01" value="0" inputmode="decimal"></label>
+          <label>صورة الصنف<input id="item-image-file" type="file" accept="image/png,image/jpeg,image/webp"><small>تُضغط تلقائيًا قبل الحفظ.</small></label>
+          <div class="span-2 form-actions"><button class="primary" type="submit">إضافة الصنف</button></div>
+        </form>
+      </div>
+      <div class="panel"><div class="panel-head"><div><h3>الأصناف المتاحة</h3><p>حرّك الكميات لتسجيل الاستلام أو الصرف من المخزون.</p></div><div class="inventory-tools"><form id="inventory-scan-form" class="inventory-scan-form"><input id="inventory-scan-code" class="search" placeholder="امسح الباركود ثم Enter" autocomplete="off" aria-label="مسح باركود الصنف"><button class="secondary" type="submit">بحث بالباركود</button></form><input id="inventory-search" class="search" placeholder="بحث عن صنف"></div></div>
+        <div class="table-wrap"><table><thead><tr><th>الصورة</th><th>الرمز</th><th>الصنف</th><th>العيار</th><th>وزن القطعة</th><th>الكمية</th><th>تكلفة FIFO</th><th>إجراء</th></tr></thead><tbody id="inventory-rows"></tbody></table></div>
+      </div>
+      <div class="panel"><div class="panel-head"><div><h3>اقتراحات إعادة الطلب</h3><p>مبنية على متوسط الصرف في الفترة التي يحددها المدير؛ يمكنك تعديل المقترح قبل حفظه.</p></div></div><div class="table-wrap"><table><thead><tr><th>الصنف</th><th>المتاح</th><th>حد التنبيه</th><th>متوسط الصرف اليومي</th><th>اقتراح الطلب</th><th>إجراء</th></tr></thead><tbody id="reorder-rows"></tbody></table></div></div>
+      <div class="panel"><div class="panel-head"><h3>آخر حركات المخزون</h3></div><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>الصنف</th><th>الحركة</th><th>الكمية</th><th>الموظف</th><th>ملاحظة</th></tr></thead><tbody id="inventory-movement-rows"></tbody></table></div></div>
+    </section>
+    <section class="view" id="view-suppliers">
+      <div class="panel"><div class="panel-head"><div><h3>إضافة مورد</h3><p>أنشئ سجلًا للمورد لمتابعة مشترياته والرصيد المستحق له.</p></div></div><form id="supplier-form" class="form-grid"><label>اسم المورد *<input id="supplier-name" required maxlength="100"></label><label>الهاتف<input id="supplier-phone" maxlength="30"></label><label class="span-2">ملاحظات<textarea id="supplier-notes" rows="2" maxlength="300"></textarea></label><div class="span-2 form-actions"><button class="primary">حفظ المورد</button></div></form></div>
+      <div class="panel"><div class="panel-head"><div><h3>تسجيل فاتورة شراء واستلام مخزون</h3><p>أدخل صنفًا واحدًا لكل مستند. تُنشأ دفعة تكلفة FIFO وحركة استلام مرتبطة بالمورد تلقائيًا.</p></div></div><form id="supplier-purchase-form" class="form-grid"><label>المورد *<select id="purchase-supplier" required><option value="">أضف موردًا أولًا</option></select></label><label>رقم فاتورة المورد<input id="purchase-invoice-no" maxlength="80"></label><label>تاريخ الشراء<input id="purchase-date" type="date" required></label><label>رمز الصنف / SKU<input id="purchase-sku" maxlength="40"></label><label>اسم الصنف *<input id="purchase-item-name" required maxlength="100"></label><label>العيار *<select id="purchase-karat"><option>24</option><option>22</option><option selected>21</option><option>18</option><option>14</option><option>9</option></select></label><label>وزن القطعة (جم) *<input id="purchase-weight" type="number" min="0.001" step="0.001" required></label><label>الكمية *<input id="purchase-quantity" type="number" min="1" step="1" value="1" required></label><label>تكلفة شراء القطعة (ج.م) *<input id="purchase-unit-cost" type="number" min="0" step="0.01" required></label><label>مصنعية القطعة (ج.م)<input id="purchase-unit-making" type="number" min="0" step="0.01" value="0"></label><label>المدفوع للمورد الآن<input id="purchase-paid" type="number" min="0" step="0.01" value="0"></label><label>طريقة الدفع<select id="purchase-payment-method"><option value="cash">نقدًا</option><option value="bank">تحويل بنكي</option><option value="other">أخرى</option></select></label><label class="span-2">ملاحظات<textarea id="purchase-notes" rows="2" maxlength="300"></textarea></label><div class="span-2 preview" id="purchase-total-preview">إجمالي الشراء: 0.00 ج.م · المتبقي للمورد: 0.00 ج.م</div><div class="span-2 form-actions"><button class="primary">حفظ الفاتورة واستلام المخزون</button></div></form></div>
+      <div class="panel"><div class="panel-head"><div><h3>سداد مستحق لمورد</h3><p>السداد النقدي ينعكس في إقفال النقدية، والتحويل البنكي يبقى في سجل المورد فقط.</p></div></div><form id="supplier-payment-form" class="form-grid"><label>المورد *<select id="supplier-payment-supplier" required><option value="">اختر موردًا</option></select></label><label>المبلغ (ج.م) *<input id="supplier-payment-amount" type="number" min="0.01" step="0.01" required></label><label>تاريخ السداد<input id="supplier-payment-date" type="date" required></label><label>طريقة الدفع<select id="supplier-payment-method"><option value="cash">نقدًا</option><option value="bank">تحويل بنكي</option><option value="other">أخرى</option></select></label><label class="span-2">البيان<input id="supplier-payment-note" maxlength="300"></label><div class="span-2 form-actions"><button class="primary">حفظ السداد</button></div></form></div>
+      <div class="panel"><div class="panel-head"><div><h3>الموردون والأرصدة</h3></div></div><div class="table-wrap"><table><thead><tr><th>المورد</th><th>الهاتف</th><th>المشتريات</th><th>المدفوع</th><th>الرصيد المستحق</th></tr></thead><tbody id="supplier-rows"></tbody></table></div></div>
+      <div class="panel"><div class="panel-head"><div><h3>آخر فواتير الشراء والسداد</h3></div></div><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>المورد</th><th>المرجع / البيان</th><th>النوع</th><th>المبلغ</th><th>الموظف</th></tr></thead><tbody id="supplier-history-rows"></tbody></table></div></div>
+    </section>
+    <section class="view" id="view-cash-close">
+      <div class="panel"><div class="panel-head"><div><h3>إقفال الصندوق اليومي</h3><p>يحسب النظام النقد الداخل والخارج من الحركات النقدية المسجلة، ويقارن الرصيد المتوقع بالنقد المعدود فعليًا. الحركات البنكية لا تدخل في النقدية.</p></div><span id="cash-close-state" class="pill"></span></div><div class="cash-close-stats"><article class="stat"><span class="stat-label">نقد داخل اليوم</span><strong id="cash-close-in">0.00 ج.م</strong></article><article class="stat"><span class="stat-label">نقد خارج اليوم</span><strong id="cash-close-out">0.00 ج.م</strong></article><article class="stat"><span class="stat-label">صافي الحركة</span><strong id="cash-close-net">0.00 ج.م</strong></article><article class="stat"><span class="stat-label">الرصيد المتوقع</span><strong id="cash-close-expected">0.00 ج.م</strong></article></div><form id="cash-close-form" class="form-grid cash-close-form"><label>تاريخ الإقفال<input id="cash-close-date" type="date" required></label><label>رصيد افتتاحي في الدرج<input id="cash-close-opening" type="number" min="0" step="0.01" value="0" required></label><label>النقد المعدود فعليًا<input id="cash-close-actual" type="number" min="0" step="0.01" required></label><label class="span-2">ملاحظات<textarea id="cash-close-notes" rows="2" maxlength="500"></textarea></label><div class="span-2 preview" id="cash-close-difference">الفرق: —</div><div class="span-2 form-actions"><button class="primary" id="cash-close-submit">إرسال الإقفال للمراجعة</button><button type="button" class="secondary" id="cash-close-refresh">تحديث الملخص</button></div></form><div class="table-wrap"><table><thead><tr><th>الحركة</th><th>المبلغ</th><th>المصدر</th><th>الموظف</th><th>المرجع</th></tr></thead><tbody id="cash-close-events"></tbody></table></div></div>
+      <div class="panel"><div class="panel-head"><div><h3>إقفالات الأيام السابقة</h3><p>يستطيع المدير اعتماد الإقفال بعد مراجعة الفرق.</p></div></div><div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>الموظف</th><th>المتوقع</th><th>المعدود</th><th>الفرق</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="cash-close-recent"></tbody></table></div></div>
+    </section>
+    <section class="view" id="view-vault"><iframe class="vault-frame" title="مطابقة الخزنة"></iframe></section>
+    <section class="view" id="view-reports">
+      <div class="panel"><div class="panel-head"><div><h3>تقارير الفترة</h3><p>الحركات المالية ومؤشرات العمل حسب الفترة والموظف.</p></div><div class="filters"><input id="report-from" type="date" aria-label="من تاريخ"><input id="report-to" type="date" aria-label="إلى تاريخ"><button id="report-run" class="primary">تحديث التقرير</button><button id="report-export" class="secondary">تصدير CSV</button></div></div>
+        <div class="stats"><article class="stat"><span class="stat-label">عدد الحركات</span><strong id="report-count">0</strong></article><article class="stat"><span class="stat-label">قيمة الفواتير المسجلة</span><strong id="report-invoices">0.00 ج.م</strong></article><article class="stat"><span class="stat-label">صافي أثر الحركات النقدية</span><strong id="report-net">0.00 ج.م</strong></article><article class="stat"><span class="stat-label">إجمالي أوزان الفواتير</span><strong id="report-weight">0.000 جم</strong></article></div>
+        <div class="form-actions report-actions"><button id="report-print" class="secondary" type="button">طباعة التقرير</button></div>
+        <h3>حسب الموظف</h3><div class="table-wrap"><table><thead><tr><th>الموظف</th><th>عدد الحركات</th><th>قيمة الفواتير</th><th>صافي الأثر المالي</th></tr></thead><tbody id="report-user-rows"></tbody></table></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-price-history">
+      <div class="panel"><div class="panel-head"><div><h3>حركة أسعار الذهب</h3><p>سجلّ التاريخ والعيار والمصدر ومن أدخل السعر يدويًا.</p></div><div class="filters"><select id="price-history-range"><option value="day">اليوم</option><option value="week" selected>آخر 7 أيام</option><option value="month">آخر 30 يومًا</option></select><button id="price-history-refresh" class="secondary">تحديث</button></div></div><div class="price-history-chart" id="price-history-chart" aria-label="رسم تغير أسعار الذهب"></div><div class="table-wrap"><table><thead><tr><th>التاريخ والوقت</th><th>عيار 24</th><th>عيار 21</th><th>عيار 18</th><th>المصدر</th><th>أدخله</th></tr></thead><tbody id="price-history-rows"></tbody></table></div></div>
+    </section>
+    <section class="view" id="view-analytics">
+      <div class="panel"><div class="panel-head"><div><h3>مؤشرات المدير</h3><p>ملخص المبيعات والحركات حسب الفترة. الأرباح لا تشمل إلا الفواتير المرتبطة بتكلفة FIFO مكتملة.</p></div><div class="filters"><input id="analytics-from" type="date"><input id="analytics-to" type="date"><button id="analytics-run" class="primary">تحديث</button><button id="analytics-print" class="secondary">طباعة</button></div></div><div class="stats"><article class="stat"><span class="stat-label">إجمالي المبيعات</span><strong id="analytics-revenue">0 ج.م</strong></article><article class="stat"><span class="stat-label">عدد حركات البيع</span><strong id="analytics-sales-count">0</strong></article><article class="stat"><span class="stat-label">وزن الذهب المباع</span><strong id="analytics-weight">0 جم</strong></article><article class="stat"><span class="stat-label">موظفون لديهم حركات</span><strong id="analytics-staff-count">0</strong></article><article class="stat"><span class="stat-label">الربح الموثق اليوم</span><strong id="analytics-profit-today">0.00 ج.م</strong></article><article class="stat"><span class="stat-label">الربح الموثق آخر 7 أيام</span><strong id="analytics-profit-week">0.00 ج.م</strong></article></div><p class="muted">فواتير بتكلفة موثقة: <strong id="analytics-profit-eligible">0</strong> · فواتير غير مكتملة التكلفة: <strong id="analytics-profit-missing">0</strong></p><h3>الأصناف الأكثر مبيعًا</h3><div class="table-wrap"><table><thead><tr><th>الصنف</th><th>الكمية</th><th>قيمة البيع</th></tr></thead><tbody id="analytics-products"></tbody></table></div><h3>أداء الموظفين</h3><div class="table-wrap"><table><thead><tr><th>الموظف</th><th>عدد الحركات</th><th>عدد المبيعات</th><th>قيمة الفواتير</th></tr></thead><tbody id="analytics-employees"></tbody></table></div></div>
+    <div class="panel"><h3>حركة المبيعات اليومية</h3><p class="muted">قيمة المبيعات لكل يوم ضمن الفترة المختارة.</p><div id="analytics-chart" class="analytics-chart"></div></div>
+    </section>
+    <section class="view" id="view-customers-analysis">
+      <div class="panel"><div class="panel-head"><div><h3>تحليل العملاء</h3><p>الأكثر نشاطًا وخمول العملاء حسب آخر حركة.</p></div><div class="filters"><label>خامل منذ (يوم)<input id="customer-inactive-days" type="number" min="1" value="90"></label><button id="customer-analysis-run" class="primary">تحليل</button><button id="customer-analysis-export" class="secondary">تصدير الخاملين</button></div></div><h3>الأكثر نشاطًا</h3><div class="table-wrap"><table><thead><tr><th>العميل</th><th>عدد الحركات</th><th>قيمة الفواتير</th><th>آخر حركة</th></tr></thead><tbody id="customer-active-rows"></tbody></table></div><h3>بلا حركة حديثة</h3><div class="table-wrap"><table><thead><tr><th>العميل</th><th>الهاتف</th><th>آخر حركة</th><th>أيام الخمول</th></tr></thead><tbody id="customer-inactive-rows"></tbody></table></div></div>
+    </section>
+    <section class="view" id="view-profit">
+      <div class="panel"><div class="panel-head"><div><h3>الربح الفعلي حسب FIFO</h3><p>يُحتسب ربح كل صنف عند ربطه بالمخزون وتسجيل تكلفة الاستلام. لا تُجمع الفاتورة ضمن الإجمالي إلا إذا اكتملت تكلفة جميع أصنافها.</p></div><div class="filters"><input id="profit-from" type="date"><input id="profit-to" type="date"><button id="profit-run" class="primary">تحديث</button></div></div><div class="stats"><article class="stat"><span class="stat-label">ربح الفواتير ذات التكلفة الكاملة</span><strong id="profit-total">—</strong></article><article class="stat"><span class="stat-label">فواتير محسوبة</span><strong id="profit-count">0</strong></article><article class="stat"><span class="stat-label">فواتير تكلفة غير مكتملة</span><strong id="profit-unverified">0</strong></article></div><div class="table-wrap"><table><thead><tr><th>الفاتورة</th><th>الصنف والكمية</th><th>التاريخ</th><th>العميل</th><th>الموظف</th><th>ربح الصنف</th><th>حالة التكلفة</th></tr></thead><tbody id="profit-rows"></tbody></table></div></div>
+    </section>
+    <section class="view" id="view-pieces">
+      <div class="panel manager-only"><div class="panel-head"><div><h3>تسجيل قطعة مميزة</h3><p>رقم تسلسلي فريد وسجل حياة كامل للقطعة.</p></div></div><form id="piece-form" class="form-grid"><label>اسم الصنف *<input name="name" required maxlength="100"></label><label>الوزن بالجرام *<input name="weight" type="number" min="0.001" step="0.001" required></label><label>العيار *<select name="karat"><option>24</option><option>22</option><option selected>21</option><option>18</option><option>14</option><option>9</option></select></label><label>مصدر الاستلام<input name="source" maxlength="160"></label><label>تكلفة شراء القطعة<input name="unitCost" type="number" min="0" step="0.01"></label><label>تكلفة تصنيعها<input name="unitMakingCost" type="number" min="0" step="0.01" value="0"></label><label class="span-2">الوصف<textarea name="description" maxlength="500"></textarea></label><label>صورة القطعة<input name="image" type="file" accept="image/png,image/jpeg,image/webp"><small>تُصغّر داخل المتصفح قبل حفظها.</small></label><div class="form-actions"><button class="primary">تسجيل القطعة</button></div></form></div>
+      <div class="panel"><div class="panel-head"><div><h3>سجل القطع وحالتها</h3><p>القطعة المباعة لا تتاح ثانية حتى اعتماد إرجاعها.</p></div><input id="piece-search" class="search" placeholder="بحث بالرقم أو الوصف"></div><div class="table-wrap"><table><thead><tr><th>الصورة</th><th>الرقم التسلسلي</th><th>الصنف</th><th>العيار والوزن</th><th>الحالة</th><th>العميل / الفاتورة</th><th>إجراء</th></tr></thead><tbody id="piece-rows"></tbody></table></div><div id="piece-history" class="piece-history"></div></div>
+    </section>
+    <section class="view" id="view-manufacturing">
+      <div class="panel"><div class="panel-head"><div><h3>طلب تصنيع جديد</h3><p>مراحل الطلب: استلام المواد، قيد التصنيع، جاهز، تم التسليم.</p></div></div><form id="manufacturing-form" class="form-grid"><label>اسم العميل *<input name="customerName" required maxlength="100"></label><label>ملف عميل (اختياري)<select name="customerId" id="manufacturing-customer"><option value="">بدون ربط</option></select></label><label class="span-2">المواصفات *<textarea name="specification" required minlength="3" maxlength="1000"></textarea></label><label>العيار<input name="karat" maxlength="3"></label><label>الوزن<input name="weight" type="number" min="0" step="0.001"></label><label>السعر الإجمالي *<input name="totalPrice" type="number" min="0.01" step="0.01" required></label><label>العربون<input name="deposit" type="number" min="0" step="0.01" value="0"></label><label>الورشة الخارجية<input name="workshop" maxlength="120"></label><label>مصنعية الورشة<input name="workshopMakingCost" type="number" min="0" step="0.01"></label><label>موعد التسليم من الورشة<input name="workshopDueDate" type="date"></label><label>موعد تسليم العميل<input name="dueDate" type="date"></label><div class="form-actions"><button class="primary">إنشاء الطلب</button></div></form></div><div class="panel"><h3>أوامر التصنيع</h3><div class="table-wrap"><table><thead><tr><th>رقم الطلب</th><th>العميل</th><th>المواصفات</th><th>الورشة</th><th>الإجمالي / المتبقي</th><th>الحالة</th><th>الإجراء التالي</th></tr></thead><tbody id="manufacturing-rows"></tbody></table></div></div>
+    </section>
+    <section class="view" id="view-pledges">
+      <div class="panel"><div class="panel-head"><div><h3>تسجيل رهن أو ضمان</h3><p>رسوم الرهن اختيارية وتُحسب وفق النسبة التي يحددها المدير.</p></div></div><form id="pledge-form" class="form-grid"><label>اسم العميل *<input name="customerName" required maxlength="100"></label><label>ملف عميل (اختياري)<select name="customerId" id="pledge-customer"><option value="">بدون ربط</option></select></label><label>المبلغ (ج.م) *<input name="amount" type="number" min="0.01" step="0.01" required></label><label>الوزن (جرام) *<input name="weight" type="number" min="0.001" step="0.001" required></label><label>العيار *<select name="karat"><option>24</option><option>22</option><option selected>21</option><option>18</option><option>14</option></select></label><label>تاريخ الرهن<input name="date" type="date" required></label><label>موعد الاسترداد *<input name="dueDate" type="date" required></label><label class="span-2">ملاحظات<textarea name="notes" maxlength="500"></textarea></label><div class="form-actions"><button class="primary">تسجيل الرهن</button></div></form></div><div class="panel"><h3>سجل الرهون</h3><div class="table-wrap"><table><thead><tr><th>رقم الرهن</th><th>العميل</th><th>المبلغ</th><th>الذهب</th><th>موعد الاسترداد</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="pledge-rows"></tbody></table></div></div>
+    </section>
+    <section class="view" id="view-alerts"><div class="panel"><div class="panel-head"><div><h3>مركز التنبيهات</h3><p>أسعار الذهب والمخزون والنسخ والحركات غير الاعتيادية.</p></div><button id="alerts-refresh" class="secondary">تحديث</button></div><div id="alert-list" class="alert-list"></div></div></section>
+    <section class="view" id="view-security">
+      <div class="panel"><div class="panel-head"><div><h3>إعدادات الأمان والتنبيهات</h3><p>تطبق على النظام المشترك بالكامل.</p></div></div><form id="advanced-settings-form" class="form-grid"><label>إنهاء الجلسة بعد الخمول (دقيقة)<input name="idleTimeoutMinutes" type="number" min="5" max="720"></label><label>تنبيه السعر إذا تغير (%)<input name="goldAlertThresholdPercent" type="number" min="0.1" max="100" step="0.1"></label><label>فترة التغير (دقيقة)<input name="goldAlertWindowMinutes" type="number" min="1" max="1440"></label><label>فترة متوسط المبيعات (يوم)<input name="reorderPeriodDays" type="number" min="1" max="365"></label><label>أيام توريد المخزون<input name="reorderLeadDays" type="number" min="0" max="365"></label><label>أيام الأمان للمخزون<input name="reorderSafetyDays" type="number" min="0" max="365"></label><label>التنبيه قبل استحقاق الرهن (يوم)<input name="pledgeReminderDays" type="number" min="0" max="365"></label><label>رسوم الرهن (%)<input name="pledgeFeePercent" type="number" min="0" max="100" step="0.01"></label><label>عدد الإلغاءات للتنبيه<input name="anomalyCancelCount" type="number" min="2" max="100"></label><label>نافذة الإلغاءات (دقيقة)<input name="anomalyCancelMinutes" type="number" min="1" max="1440"></label><label>بداية الدوام<input name="workStart" type="time"></label><label>نهاية الدوام<input name="workEnd" type="time"></label><label>نسبة الخصم للتنبيه (%)<input name="anomalyDiscountPercent" type="number" min="0" max="100"></label><div class="span-2 form-actions"><button class="primary">حفظ الإعدادات</button></div></form></div>
+      <div class="panel"><div class="panel-head"><div><h3>التحقق بخطوتين</h3><p>تطبيق مصادقة يدعم TOTP؛ أدخل الرمز الظاهر لتأكيد الإعداد.</p></div><span id="two-factor-state" class="pill"></span></div><div id="two-factor-setup" hidden><code id="two-factor-uri" dir="ltr"></code><p>المفتاح اليدوي: <strong id="two-factor-secret" dir="ltr"></strong></p><form id="two-factor-confirm-form" class="form-grid"><label>رمز التحقق<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><div class="form-actions"><button class="primary">تأكيد التفعيل</button></div></form></div><div class="form-actions"><button id="two-factor-start" class="primary">إعداد التحقق بخطوتين</button><button id="two-factor-disable" class="danger" hidden>إيقاف التحقق بخطوتين</button></div></div>
+      <div class="panel"><div class="panel-head"><div><h3>مراجعة صلاحيات الموظفين</h3><p>الصلاحية المؤقتة تنتهي في التاريخ المحدد؛ تغيير كلمة المرور مطلوب عند أول دخول.</p></div></div><div class="table-wrap"><table><thead><tr><th>الموظف</th><th>الصلاحيات الحالية</th><th>تنتهي في</th><th>إجراء</th></tr></thead><tbody id="permission-review-rows"></tbody></table></div></div>
+    </section>
+    <section class="view" id="view-backup">
+      <div class="panel">
+        <div class="panel-head"><div><h3>النسخ الاحتياطي واستعادة البيانات</h3><p>صدّر نسخة من بيانات النظام المشتركة أو استعد نسخة سابقة.</p></div></div>
+        <div class="backup-grid">
+          <div class="backup-card" id="backup-export-card"><div class="big-icon">⇩</div><h3>تصدير نسخة احتياطية</h3><p>ينزّل ملف JSON يحتوي على العملاء والحركات المسجلة.</p><button class="primary" id="export-btn">تنزيل النسخة الاحتياطية</button></div>
+          <div class="backup-card manager-only"><div class="big-icon">⇧</div><h3>استعادة نسخة</h3><p>اختر ملف JSON سابقًا. ستُستبدل البيانات الحالية بالبيانات الموجودة في الملف.</p><input id="import-file" type="file" accept=".json,application/json"><button class="secondary" id="import-btn">استعادة البيانات</button></div>
+          <div class="backup-card danger-card manager-only"><div class="big-icon">!</div><h3>مسح جميع البيانات</h3><p>يحذف جميع العملاء والحركات من الخادم. صدّر نسخة أولًا.</p><button class="danger" id="clear-btn">مسح البيانات</button></div>
+        </div>
+      </div>
+      <div class="panel manager-only csv-import-panel">
+        <div class="panel-head"><div><h3>استيراد العملاء أو المخزون من Excel</h3><p>احفظ ورقة Excel بصيغة CSV UTF-8، ثم راجع المعاينة. لا تُضاف البيانات إلا بعد ضغط زر الاعتماد.</p></div></div>
+        <div class="csv-import-controls">
+          <label>نوع البيانات<select id="csv-import-type"><option value="customers">العملاء</option><option value="inventory">المخزون</option></select></label>
+          <label>ملف CSV UTF-8<input id="csv-import-file" type="file" accept=".csv,text/csv,text/plain"></label>
+          <div class="form-actions"><button type="button" class="secondary" id="csv-template-customers">تنزيل قالب العملاء</button><button type="button" class="secondary" id="csv-template-inventory">تنزيل قالب المخزون</button></div>
+        </div>
+        <p id="csv-import-summary" class="csv-import-summary" aria-live="polite">اختر نوع البيانات ثم ملف CSV لمعاينته.</p>
+        <div class="table-wrap csv-import-preview-wrap"><table><thead id="csv-import-head"><tr><th>رقم الصف</th><th>البيانات</th><th>النتيجة</th></tr></thead><tbody id="csv-import-rows"><tr><td colspan="3" class="empty">لا توجد معاينة بعد.</td></tr></tbody></table></div>
+        <div class="form-actions"><button id="csv-import-apply" type="button" class="primary" disabled>اعتماد الصفوف الصالحة وإضافتها</button></div>
+        <small class="csv-import-help">استيراد العملاء ينقل الاسم والهاتف والملاحظات فقط، ولا ينشئ أرصدة أو حركات تاريخية. استيراد المخزون يحتاج الاسم والعيار والوزن والكمية، وتكلفة الشراء لكل وحدة عند وجود كمية. الصفوف المكررة أو غير الصالحة ستُستبعد.</small>
+      </div>
+      <div class="panel manager-only"><div class="panel-head"><div><h3>النسخ التلقائي على الخادم</h3><p>ينشئ الخادم نسخة يومية عند الساعة 02:00 ويحتفظ بآخر 30 يومًا.</p></div><button id="backup-now-btn" class="secondary">إنشاء نسخة الآن</button></div>
+        <div class="table-wrap"><table><thead><tr><th>الملف</th><th>وقت الإنشاء</th><th>الحجم</th><th>إجراء</th></tr></thead><tbody id="backup-rows"></tbody></table></div>
+      </div>
+      <div class="notice"><strong>مهم:</strong> البيانات تحفظ في قاعدة على الكمبيوتر المستضيف. احتفظ بنسخ احتياطية خارج هذا الكمبيوتر. لا تفتح الاتصال غير المشفر على الإنترنت.</div>
+    </section>
+    <section class="view" id="view-users">
+      <div class="panel"><div class="panel-head"><div><h3>إضافة موظف</h3><p>أنشئ حسابًا مستقلًا لكل موظف.</p></div></div>
+        <form id="user-form" class="form-grid">
+          <label>اسم الموظف *<input id="user-name" required maxlength="100"></label>
+          <label>اسم المستخدم *<input id="user-username" required minlength="3" maxlength="40" autocomplete="off"></label>
+          <label>كلمة المرور *<input id="user-password" type="password" required minlength="10" autocomplete="new-password"><small>10 أحرف على الأقل</small></label>
+          <div class="form-actions"><button class="primary" type="submit">إنشاء حساب الموظف</button></div>
+        </form>
+      </div>
+      <div class="panel"><div class="panel-head"><div><h3>حسابات المستخدمين</h3><p>يمكن للمدير تعطيل حساب موظف دون حذف سجل عملياته.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>الاسم</th><th>اسم المستخدم</th><th>الدور</th><th>الحالة</th><th>إجراءات وصلاحيات</th></tr></thead><tbody id="user-rows"></tbody></table></div>
+      </div>
+    </section>
+    <section class="view" id="view-audit">
+      <div class="panel"><div class="panel-head"><div><h3>سجل التدقيق</h3><p>سجلّ غير قابل للتعديل من الواجهة، يعرض آخر 1000 حدث.</p></div><input id="audit-search" class="search" placeholder="بحث باسم المستخدم أو الحدث"></div>
+        <div class="table-wrap"><table><thead><tr><th>التاريخ والوقت</th><th>المستخدم</th><th>الحدث</th><th>التفاصيل</th></tr></thead><tbody id="audit-rows"></tbody></table></div>
+      </div>
+    </section>
+    <section class="view" id="view-settings">
+      <div class="panel setup-wizard-panel">
+        <div class="panel-head"><div><h3>تهيئة المحل لأول مرة</h3><p>اجمع بيانات الهوية والفرع الأساسية هنا؛ ستظهر في الفواتير المطبوعة. لا يغيّر هذا الإجراء الحركات أو الفواتير السابقة.</p></div><span id="shop-setup-status" class="pill"></span></div>
+        <form id="shop-setup-form" class="form-grid" autocomplete="off">
+          <label>اسم المحل بالعربية *<input id="setup-shop-name-ar" required maxlength="100" placeholder="اسم المحل"></label>
+          <label>اسم المحل بالإنجليزية<input id="setup-shop-name-en" maxlength="100" dir="ltr" placeholder="SHOP NAME"></label>
+          <label>اسم الفرع *<input id="setup-branch-name" required maxlength="100" placeholder="الفرع الرئيسي"></label>
+          <label>وصف أو تخصص المحل<input id="setup-shop-tagline" maxlength="100" placeholder="ذهب ومجوهرات"></label>
+          <label class="span-2">العنوان<input id="setup-shop-address" maxlength="240" placeholder="عنوان المحل أو الفرع"></label>
+          <label class="span-2">أرقام التواصل<input id="setup-shop-phones" maxlength="180" placeholder="رقم الهاتف الأول · رقم الهاتف الثاني"></label>
+          <div class="span-2 form-actions"><button class="primary" type="submit">حفظ بيانات المحل</button><button class="secondary" type="button" id="shop-setup-copy-existing">نسخ البيانات الحالية إلى النموذج</button></div>
+        </form>
+      </div>
+      <div class="panel"><div class="panel-head"><div><h3>هوية المحل وقالب الطباعة</h3><p>تُستخدم هذه البيانات في ترويسة وتذييل الإيصالات والفواتير والتقارير المطبوعة.</p></div></div>
+        <form id="print-template-form" class="form-grid" autocomplete="off">
+          <label>اسم المحل بالعربية<input id="print-brand-ar" maxlength="100" placeholder="العزيز بالله"></label>
+          <label>اسم المحل بالإنجليزية<input id="print-brand-en" maxlength="100" dir="ltr" placeholder="AL-AZIZ BELLAH"></label>
+          <label>وصف أو تخصص المحل<input id="print-brand-tagline" maxlength="100" placeholder="JEWELRY"></label>
+          <label class="span-2">العنوان<input id="print-brand-address" maxlength="240" placeholder="عنوان المحل أو الفرع"></label>
+          <label class="span-2">أرقام التواصل<input id="print-brand-phones" maxlength="180" placeholder="رقم الهاتف الأول · رقم الهاتف الثاني"></label>
+          <label class="span-2">ملاحظة / سياسة تظهر أسفل المطبوعات<textarea id="print-brand-footer" rows="3" maxlength="600" placeholder="سياسة الاستبدال والاسترجاع أو ملاحظة للعميل"></textarea></label>
+          <label>شكل الطباعة<select id="print-template-style"><option value="classic">كلاسيكي — هوية ذهبية وعلامة مائية</option><option value="compact">مضغوط — يوفر مساحة الورق</option><option value="minimal">بسيط — بدون علامة مائية</option></select></label>
+          <label>شعار المحل (PNG أو JPG أو WebP)<input id="print-brand-logo-file" type="file" accept="image/png,image/jpeg,image/webp"><small>اختياري · حتى 1 ميجابايت</small></label>
+          <label>رمز QR اختياري (PNG أو JPG أو WebP)<input id="print-brand-qr-file" type="file" accept="image/png,image/jpeg,image/webp"><small>أرفق صورة الرمز الجاهز ليظهر في التذييل</small></label>
+          <div class="span-2 template-image-previews"><div id="print-brand-logo-preview" class="template-image-preview">لا يوجد شعار مرفوع</div><div id="print-brand-qr-preview" class="template-image-preview">لا يوجد رمز QR</div></div>
+          <div class="span-2 form-actions"><button id="print-brand-logo-remove" class="secondary" type="button">إزالة الشعار</button><button id="print-brand-qr-remove" class="secondary" type="button">إزالة QR</button><button class="primary" type="submit">حفظ قالب الطباعة</button></div>
+        </form>
+      </div>
+      <div class="panel"><div class="panel-head"><div><h3>إعدادات الفرع والمصنعية</h3><p>تُضاف المصنعية والضريبة إلى سعر العيار لإظهار تقدير اختياري لفاتورة البيع.</p></div></div>
+        <form id="settings-form" class="form-grid">
+          <label class="span-2">اسم الفرع<input id="setting-branch" maxlength="100" required></label>
+          <label>مصنعية لكل جرام (ج.م)<input id="setting-making" type="number" min="0" step="0.01"></label>
+          <label>الضريبة %<input id="setting-tax" type="number" min="0" max="100" step="0.01"></label>
+          <label>فرق الشراء عن سعر البيع / جرام<input id="setting-buy-spread" type="number" min="0" step="0.01"></label>
+          <label>كاش باك السبائك / جرام<input id="setting-bullion-cashback" type="number" min="0" step="0.01"></label>
+          <label>دمغة المشغولات / جرام<input id="setting-stamp" type="number" min="0" step="0.01"></label>
+          <div class="span-2 preview">إعدادات حاسبة المصنعية والشراء: فرق الشراء الافتراضي 50 ج.م/جرام، كاش باك السبائك 0، والدمغة 13 ج.م/جرام. المصنعية حسب الصنف قابلة للتعديل في الحاسبة، والضريبة تُطبق على البيع فقط.</div>
+          <div class="span-2 form-actions"><button class="primary" type="submit">حفظ الإعدادات</button></div>
+        </form>
+      </div>
+      <div class="panel"><div class="panel-head"><div><h3>مصدر أسعار العيارات</h3><p>يُحدّث السعر العالمي تلقائيًا، أو أدخل الأسعار يدويًا لتعميمها على جميع المستخدمين.</p></div></div>
+        <form id="gold-prices-form" class="gold-price-settings">
+          <label class="gold-price-mode-label">طريقة التسعير<select id="gold-price-mode"><option value="auto">تلقائي — السعر العالمي</option><option value="manual">يدوي — أستخدم الأسعار التي أدخلها</option></select></label>
+          <div class="gold-price-input-grid">
+            <label>عيار 24 — ج.م/جرام<input id="gold-price-input-24" type="number" min="0.01" step="0.01" inputmode="decimal"></label>
+            <label>عيار 21 — ج.م/جرام<input id="gold-price-input-21" type="number" min="0.01" step="0.01" inputmode="decimal"></label>
+            <label>عيار 18 — ج.م/جرام<input id="gold-price-input-18" type="number" min="0.01" step="0.01" inputmode="decimal"></label>
+          </div>
+          <p class="gold-price-note">السعر العالمي استرشادي ويُحوّل إلى الجنيه؛ المصدر المجاني قد يتأخر حتى 15 دقيقة. لا يشمل المصنعية أو الضريبة أو هامش البيع. عند اختيار الوضع اليدوي، لن تُستبدل الأسعار حتى تعيد الوضع التلقائي.</p>
+          <div class="form-actions"><button class="primary" type="submit">حفظ أسعار العيارات</button></div>
+          <div id="gold-price-settings-status" class="gold-price-status" aria-live="polite"></div>
+        </form>
+      </div>
+      <div class="notice"><strong>فرع واحد حاليًا:</strong> يمكن إضافة إدارة فروع مستقلة لاحقًا، لكن يتطلب ذلك تحديد المستخدمين والمخزون والحسابات التي يراها كل فرع.</div>
+    </section>
+    <footer>نظام حسابات العملاء — خادم شبكة المحل</footer>
+  </main>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <div id="auth-screen" class="auth-screen" hidden></div>
+  <div id="print-area" hidden></div>
+  <script src="app.js"></script>
+  <script src="advanced.js"></script>
+</body>
+</html>

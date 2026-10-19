@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>مطابقة الخزنة | حسابات عملاء محل الذهب</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+
+<header>
+    <h1>سجل مطابقة الخزنة والسيستم</h1>
+    <h2>محل العزيز بالله للذهب والمجوهرات</h2>
+    <p id="vaultUserBadge" class="vault-user-badge"></p>
+    <div id="saveStatus">🟢 تم الحفظ</div>
+</header>
+
+<section class="toolbar">
+    <button id="newDayBtn">📅 يوم جديد</button>
+    <button id="closeDayBtn" class="warning">🔒 إغلاق اليوم</button>
+    <button id="openDayBtn" class="secondary hidden">🔓 فتح اليوم</button>
+    <button id="printBtn">📊 إعداد التقرير</button>
+    <button id="backupBtn" class="secondary">💾 تصدير نسخة</button>
+    <button id="importBackupBtn" class="secondary">📥 استيراد نسخة</button>
+    <input type="file" id="backupFile" accept="application/json" hidden>
+</section>
+
+<div id="closedBanner" class="closed hidden">
+    🔒 اليوم مغلق ولا يمكن تعديل البيانات.
+</div>
+<div id="vaultConflictNotice" class="vault-conflict hidden" role="alert">
+    <strong>وجد النظام تعديلات متزامنة على أحد الأيام.</strong>
+    <span id="vaultConflictText"></span>
+    <div><button type="button" id="vaultUseServer" class="secondary">اعتماد نسخة الخادم</button><button type="button" id="vaultUseLocal" class="warning">اعتماد تعديلاتي لهذا اليوم</button><button type="button" id="vaultExportLocal" class="secondary">تنزيل نسخة من تعديلاتي</button></div>
+</div>
+
+<section class="info-box">
+    <div>
+        <label>التاريخ</label>
+        <input type="date" id="date">
+    </div>
+    <div>
+        <label>اليوم</label>
+        <select id="day">
+            <option value="">اختر اليوم</option>
+            <option value="الأحد">الأحد</option>
+            <option value="الإثنين">الإثنين</option>
+            <option value="الثلاثاء">الثلاثاء</option>
+            <option value="الأربعاء">الأربعاء</option>
+            <option value="الخميس">الخميس</option>
+            <option value="الجمعة">الجمعة</option>
+            <option value="السبت">السبت</option>
+        </select>
+    </div>
+    <div>
+        <label>الموظف</label>
+        <input type="text" id="employeeName" placeholder="اسم الموظف">
+    </div>
+</section>
+
+<section class="balances">
+    <div class="balance-card opening">
+        <span>الرصيد الافتتاحي</span>
+        <input type="number" id="openingBalance" step="0.01" placeholder="0.00">
+    </div>
+
+    <div class="balance-card system">
+        <span>رصيد السيستم</span>
+        <input type="number" id="systemBalanceInput" step="0.01" placeholder="أدخل مبلغ السيستم">
+        <small>أدخل الرصيد الظاهر في سيستم المحل يدويًا</small>
+    </div>
+
+    <div class="balance-card actual">
+        <span>الرصيد الفعلي في الخزنة</span>
+        <input type="number" id="actualBalance" step="0.01" placeholder="أدخل المبلغ الذي قمت بعدّه">
+    </div>
+
+    <div id="differenceCard" class="balance-card difference neutral">
+        <span>الفرق</span>
+        <strong id="difference">0.00</strong>
+        <small id="differenceText">أدخل الرصيد الفعلي</small>
+    </div>
+</section>
+
+<section class="summary">
+    <div>
+        <span>إجمالي الدخول</span>
+        <strong id="totalIn">0.00</strong>
+    </div>
+    <div>
+        <span>إجمالي الخروج</span>
+        <strong id="totalOut">0.00</strong>
+    </div>
+    <div>
+        <span>الرصيد بعد العمليات</span>
+        <strong id="finalSystemBalance">0.00</strong>
+    </div>
+</section>
+
+<section class="notes">
+    <label>ملاحظات المطابقة / سبب الفرق</label>
+    <textarea id="notes" placeholder="مثال: سداد عميل لم يتم تسجيله في السيستم..."></textarea>
+</section>
+
+<div class="table-title">
+    <h3>العمليات</h3>
+    <input id="search" type="search" placeholder="🔎 بحث في العمليات">
+</div>
+
+<section class="fast-entry" aria-label="الإدخال السريع للعمليات">
+    <div class="fast-entry-heading">
+        <div><h4>إدخال سريع من الورقة</h4><small>اختر دخول أو خروج، اكتب المبلغ، ثم Enter. يبقى المؤشر على خانة المبلغ للحركة التالية.</small></div>
+        <small>Alt + 1 دخول · Alt + 2 خروج</small>
+    </div>
+    <div class="fast-entry-fields">
+        <div class="fast-entry-types" role="group" aria-label="نوع العملية">
+            <button type="button" id="quickTypeIn" class="fast-type selected" aria-pressed="true">＋ دخول</button>
+            <button type="button" id="quickTypeOut" class="fast-type" aria-pressed="false">− خروج</button>
+        </div>
+        <input id="quickAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="المبلغ" aria-label="المبلغ">
+        <input id="quickDescription" type="text" placeholder="البيان (اختياري)" aria-label="البيان">
+        <input id="quickSystemRef" type="text" inputmode="numeric" placeholder="رقم الحركة (اختياري)" aria-label="رقم الحركة">
+        <button type="button" id="quickAddBtn" class="fast-add">إضافة الحركة ↵</button>
+    </div>
+    <div id="quickEntryStatus" class="fast-entry-status" aria-live="polite">الموظف المحدد أعلى الصفحة سيُسجّل تلقائيًا على الحركة.</div>
+</section>
+
+<div class="table-wrapper">
+<table>
+<thead>
+<tr>
+<th>رقم</th>
+<th>دخول</th>
+<th>خروج</th>
+<th>البيان</th>
+<th>الموظف</th>
+<th class="system-ref-col">مرجع السيستم</th>
+<th>الرصيد بعد العملية</th>
+<th>قفل</th>
+</tr>
+</thead>
+<tbody id="operations"></tbody>
+<tfoot>
+<tr>
+<th>الإجمالي</th>
+<th id="footIn">0.00</th>
+<th id="footOut">0.00</th>
+<th>—</th>
+<th>—</th>
+<th>—</th>
+<th id="footBalance">0.00</th>
+<th>—</th>
+</tr>
+</tfoot>
+</table>
+</div>
+
+<div class="actions">
+    <button id="addBtn">+ إضافة عملية</button>
+    <button id="clearBtn" class="danger">🗑️ مسح بيانات اليوم</button>
+</div>
+
+
+<section class="reconciliation-panel">
+<h3>🔎 مطابقة تقرير السيستم</h3>
+<p class="report-help">ارفع تقرير كشف حساب الخزينة PDF وأدخل المبلغ النقدي الذي عُدّ فعليًا. سيقارن النظام المبلغ برصيد نهاية التقرير، ثم يراجع الحركات المسجلة في اليوم لتحديد العمليات المحتملة وراء الأوفر أو العجز.</p>
+<div class="reconciliation-grid">
+<label class="upload-box"><span>📎 تقرير السيستم PDF</span><input type="file" id="systemPdf" accept="application/pdf"><small id="pdfName">لم يتم اختيار ملف</small></label>
+<label><span>💵 الرصيد الفعلي في الخزنة</span><input type="number" id="actualVaultBalance" step="0.01" placeholder="مثال: 764445"><small>يتم ربطه تلقائيًا مع الرصيد الفعلي بالأعلى.</small></label>
+</div>
+<div class="reconciliation-actions"><button id="analyzeSystemReport">🔍 تحليل ومطابقة التقرير</button><button id="clearReconciliation" class="secondary">مسح النتيجة</button></div>
+<div class="smart-audit-controls">
+<label>🔒 نوع العملية جزء من المطابقة</label>
+<label>📝 البيان دليل مساعد وليس دليلًا منفردًا</label>
+<label>🔀 ترتيب الحركات <b>غير معتمد</b> في المطابقة</label>
+<label><input type="checkbox" id="auditFindCombinations" checked> البحث عن مجموعات تفسر الفرق</label>
+</div>
+<div id="reconciliationStatus" class="reconciliation-status"></div>
+<div id="reconciliationResult" class="reconciliation-result" hidden></div><div id="smartAuditResult" class="reconciliation-result" hidden></div>
+</section>
+
+<section class="comparison-panel" id="comparisonPanel">
+<h3>🗺️ خريطة المطابقة البصرية</h3>
+<p class="report-help">السيستم على اليمين والسجل على اليسار. اختلاف ترتيب الحركات لا يؤثر على المطابقة. يمكنك سحب حركة غير متطابقة من أحد الجانبين وإفلاتها على الحركة المقابلة للمطابقة اليدوية.</p>
+<div id="visualMatchMap" class="visual-match-map"><div class="empty-visual">حلّل تقرير السيستم أولًا لعرض خريطة المطابقة.</div></div>
+</section>
+
+<section class="period-panel">
+<h3>📈 تقرير الأسبوع / الشهر</h3>
+<div class="period-controls">
+<label>من <input type="date" id="periodFrom"></label>
+<label>إلى <input type="date" id="periodTo"></label>
+<button id="periodWeek">آخر 7 أيام</button><button id="periodMonth" class="secondary">آخر 30 يومًا</button><button id="periodRefresh" class="secondary">تحديث</button>
+</div>
+<div id="periodStats" class="period-stats"></div>
+<canvas id="balanceChart" height="260"></canvas>
+</section>
+
+<section class="quick-panel">
+<h3>⚡ المقارنة السريعة</h3>
+<p class="report-help">لليوم الذي لا يتوفر فيه تقرير PDF: أدخل رصيد السيستم والرصيد الفعلي فقط.</p>
+<div class="quick-grid"><input id="quickSystem" type="number" step="0.01" placeholder="رصيد السيستم"><input id="quickActual" type="number" step="0.01" placeholder="الرصيد الفعلي"><div id="quickResult" class="quick-result">أدخل القيم لحساب الفرق</div></div>
+</section>
+
+<section class="report-panel">
+    <h3>📊 إعداد التقرير والطباعة</h3><p class="report-help">اختر حجم الورق والأعمدة المطلوبة. التقرير ينسّق الجدول تلقائيًا ويطبع الحركات المسجلة فقط.</p>
+    <label class="report-paper-size">حجم الورق
+        <select id="reportPaperSize"><option value="A4">A4 — واضح ومناسب للتقرير اليومي</option><option value="A5">A5 — نسخة أصغر</option></select>
+    </label>
+    <div class="report-options">
+        <label><input type="checkbox" class="report-col" data-col="number" checked> رقم العملية</label>
+        <label><input type="checkbox" class="report-col" data-col="income" checked> الدخول</label>
+        <label><input type="checkbox" class="report-col" data-col="outcome" checked> الخروج</label>
+        <label><input type="checkbox" class="report-col" data-col="description" checked> البيان</label>
+        <label><input type="checkbox" class="report-col" data-col="balance" checked> الرصيد بعد العملية</label>
+        <label><input type="checkbox" class="report-col" data-col="systemRef" checked> مرجع السيستم</label>
+        <label><input type="checkbox" class="report-col" data-col="employee"> الموظف</label>
+        <label><input type="checkbox" class="report-col" data-col="opening" checked> الرصيد الافتتاحي</label>
+        <label><input type="checkbox" class="report-col" data-col="closing" checked> الرصيد الختامي</label>
+        <label><input type="checkbox" class="report-col" data-col="system"> رصيد السيستم</label>
+        <label><input type="checkbox" class="report-col" data-col="actual"> الرصيد الفعلي</label>
+        <label><input type="checkbox" class="report-col" data-col="difference"> الفرق</label>
+        <label><input type="checkbox" class="report-col" data-col="notes"> الملاحظات</label>
+    </div>
+    <div class="report-actions">
+        <button id="selectAllReport">☑️ تحديد الكل</button>
+        <button id="clearAllReport" class="secondary">☐ إلغاء الكل</button>
+        <button id="generateReport">📄 إنشاء PDF</button>
+    </div>
+</section>
+
+<section class="history">
+<h3>سجل المطابقات السابقة</h3>
+<div id="history"></div>
+</section>
+
+<footer>
+    <div>توقيع الموظف: ____________________</div>
+    <div>توقيع المدير: ____________________</div>
+</footer>
+
+</div>
+<script src="script.js"></script>
+</body>
+</html>

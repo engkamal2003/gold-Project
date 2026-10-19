@@ -1,0 +1,13 @@
+{
+  "name": "gold-customer-accounts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared LAN accounting app for a gold shop",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  }
+}
