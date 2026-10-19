@@ -8,8 +8,21 @@ fs.mkdirSync(dataDir,{recursive:true});fs.mkdirSync(backupDir,{recursive:true});
 const keyPath=path.join(dataDir,".secret-key");let secretKey;if(process.env.GCA_SECRET_KEY){const configured=String(process.env.GCA_SECRET_KEY);secretKey=/^[a-f0-9]{64}$/i.test(configured)?Buffer.from(configured,"hex"):Buffer.from(configured,"base64");if(secretKey.length!==32)throw new Error("GCA_SECRET_KEY must be a 32-byte hex or base64 key.");}else{try{secretKey=fs.readFileSync(keyPath);if(secretKey.length!==32)throw new Error("Invalid local encryption key length.");}catch(error){if(error.code!=="ENOENT")throw error;secretKey=crypto.randomBytes(32);fs.writeFileSync(keyPath,secretKey,{mode:0o600,flag:"wx"});}}
 const defaultPrintBrand=()=>({arabicName:"العزيز بالله",englishName:"AL-AZIZ BELLAH",tagline:"JEWELRY",address:"",phones:"",footerNote:"",logoDataUrl:"",qrDataUrl:""});
 const emptyState=()=>({customers:[],transactions:[],inventoryItems:[],inventoryMovements:[],inventoryLots:[],nextCustomer:1,nextTransaction:1,settings:{branchName:"الفرع الرئيسي",goldPrice24:0,makingPerGram:0,taxRate:0,employeeDaysOff:{},idleTimeoutMinutes:30,goldAlertThresholdPercent:3,goldAlertWindowMinutes:60,reorderPeriodDays:30,reorderLeadDays:7,reorderSafetyDays:7,pledgeReminderDays:7,pledgeFeePercent:0,anomalyCancelCount:3,anomalyCancelMinutes:30,workStart:"09:00",workEnd:"23:00",anomalyDiscountPercent:15,printBrand:defaultPrintBrand()}});
+const DEFAULT_BRANCH_ID="main";
+const defaultBranch=()=>({id:DEFAULT_BRANCH_ID,name:"الفرع الرئيسي",address:"",phone:"",active:true,createdAt:new Date().toISOString()});
 let store;try{store=JSON.parse(fs.readFileSync(dbPath,"utf8"));}catch{store={users:[],version:0,state:emptyState(),audit:[]};}
 store.users ||= [];store.version ||= 0;store.state={...emptyState(),...(store.state||{})};store.state.settings={...emptyState().settings,...(store.state.settings||{})};store.state.settings.printBrand={...defaultPrintBrand(),...(store.state.settings.printBrand||{})};store.state.inventoryLots ||= [];store.audit ||= [];
+// ── Multi-branch migration ──────────────────────────────────────────────────
+store.branches ||= [defaultBranch()];
+if(!store.branches.some(b=>b.id===DEFAULT_BRANCH_ID))store.branches.unshift(defaultBranch());
+// Assign existing records to default branch if they don't have a branchId
+for(const c of store.state.customers)c.branchId ||= DEFAULT_BRANCH_ID;
+for(const t of store.state.transactions)t.branchId ||= DEFAULT_BRANCH_ID;
+for(const i of store.state.inventoryItems)i.branchId ||= DEFAULT_BRANCH_ID;
+for(const m of store.state.inventoryMovements)m.branchId ||= DEFAULT_BRANCH_ID;
+for(const l of store.state.inventoryLots)l.branchId ||= DEFAULT_BRANCH_ID;
+for(const u of store.users)u.branchId ||= DEFAULT_BRANCH_ID;
+// ────────────────────────────────────────────────────────────────────────────
 store.vault ||= {};store.vaultVersion ||= 0;
 store.goldPrices ||= {mode:"auto",auto:{prices:null,updatedAt:null,source:"goldprice.dev"},manual:null,error:null};
 store.goldPrices.auto ||= {prices:null,updatedAt:null,source:"goldprice.dev"};
@@ -22,7 +35,36 @@ const json=(res,status,value,headers={})=>{res.writeHead(status,{"Content-Type":
 function persist(){const temp=dbPath+".tmp";fs.writeFileSync(temp,JSON.stringify(store,null,2),{mode:0o600});fs.renameSync(temp,dbPath);}
 function readBody(req){return new Promise((resolve,reject)=>{let body="";req.on("data",chunk=>{body+=chunk;if(body.length>5_000_000){reject(new Error("حجم الطلب أكبر من المسموح."));req.destroy();}});req.on("end",()=>{try{resolve(JSON.parse(body||"{}"));}catch{reject(new Error("بيانات الطلب غير صالحة."));}});req.on("error",reject);});}
 function hasPermission(user,permission){return !!(user&&(user.role==="manager"||(((user.permissions||[]).includes(permission)||(permission==="vault:view"&&(user.permissions||[]).includes("vault:edit")))&&(!user.permissionsExpiresAt||Date.parse(user.permissionsExpiresAt)>Date.now()))));}
-function userView(u){return{id:u.id,username:u.username,name:u.name,role:u.role,active:!!u.active,permissions:u.permissionsExpiresAt&&Date.parse(u.permissionsExpiresAt)<=Date.now()?[]:(u.permissions||[]),permissionsExpiresAt:u.permissionsExpiresAt||null,mustChangePassword:!!u.mustChangePassword,twoFactorEnabled:!!u.twoFactorEnabled};}
+function userView(u){return{id:u.id,username:u.username,name:u.name,role:u.role,active:!!u.active,permissions:u.permissionsExpiresAt&&Date.parse(u.permissionsExpiresAt)<=Date.now()?[]:(u.permissions||[]),permissionsExpiresAt:u.permissionsExpiresAt||null,mustChangePassword:!!u.mustChangePassword,twoFactorEnabled:!!u.twoFactorEnabled,branchId:u.branchId||DEFAULT_BRANCH_ID};}
+// Returns the branch the current user is allowed to see.
+// Manager with ?branchId= query gets that branch; employees see their own.
+function resolveUserBranch(u,url){
+  if(u.role==="manager"){
+    const bid=url.searchParams.get("branchId")||u.branchId||DEFAULT_BRANCH_ID;
+    if(bid==="all")return"all";
+    const b=store.branches.find(x=>x.id===bid&&x.active);
+    return b?b.id:DEFAULT_BRANCH_ID;
+  }
+  return u.branchId||DEFAULT_BRANCH_ID;
+}
+function branchFilter(branchId){
+  return branchId==="all"?(()=>true):((rec)=>rec.branchId===branchId);
+}
+function stateForBranch(branchId){
+  const s=store.state;
+  const bf=branchFilter(branchId);
+  return{
+    ...s,
+    customers:s.customers.filter(bf),
+    transactions:s.transactions.filter(bf),
+    inventoryItems:s.inventoryItems.filter(bf),
+    inventoryMovements:s.inventoryMovements.filter(bf),
+    inventoryLots:s.inventoryLots.filter(bf),
+    nextCustomer:s.nextCustomer,
+    nextTransaction:s.nextTransaction,
+    settings:s.settings,
+  };
+}
 function currentUser(req){const c=(req.headers.cookie||"").split(";").map(x=>x.trim()).find(x=>x.startsWith("gca_session=")),token=c?.slice(12),session=token&&sessions.get(token);if(!session)return null;const timeout=Math.max(1,Number(store.state.settings?.idleTimeoutMinutes)||30)*60000;if(Date.now()-session.lastActivityAt>timeout){sessions.delete(token);return null;}if(req.headers["x-gca-background"]!=="1")session.lastActivityAt=Date.now();return store.users.find(u=>u.id===session.userId&&u.active)||null;}
 const cookie=(token,age=43200)=>`gca_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${age}`;
 function passwordHash(password,salt=crypto.randomBytes(16).toString("hex")){return{salt,hash:crypto.scryptSync(password,salt,64).toString("hex")};}
@@ -37,7 +79,7 @@ function validImageData(value,maxBytes){const match=/^data:image\/(png|jpeg|webp
 function validDateOnly(value){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(value||"")))return false;const date=new Date(String(value)+"T00:00:00.000Z");return Number.isFinite(date.getTime())&&date.toISOString().slice(0,10)===value;}
 function cleanPrintBrand(input){const src=input&&typeof input==="object"&&!Array.isArray(input)?input:{},out={...defaultPrintBrand()};for(const[key,max]of [["arabicName",100],["englishName",100],["tagline",100],["address",240],["phones",180],["footerNote",600]])out[key]=String(src[key]??out[key]).trim().slice(0,max);for(const key of ["logoDataUrl","qrDataUrl"]){const value=String(src[key]||"");if(value&&!validImageData(value,1024*1024))throw new Error("صورة قالب الطباعة غير صالحة أو أكبر من 1 ميجابايت.");out[key]=value;}return out;}
 function cleanState(s){if(!s||!Array.isArray(s.customers)||!Array.isArray(s.transactions))throw new Error("صيغة بيانات النظام غير صالحة.");const items=Array.isArray(s.inventoryItems)?s.inventoryItems:[];for(const item of items){const image=String(item.image||"");if(image&&!validImageData(image,300*1024))throw new Error("صورة صنف المخزون غير صالحة أو أكبر من 300 كيلوبايت.");}const settings={...store.state.settings,...(s.settings||{})};settings.printBrand=cleanPrintBrand(s.settings?.printBrand??settings.printBrand);return{customers:s.customers,transactions:s.transactions,inventoryItems:items,inventoryMovements:Array.isArray(s.inventoryMovements)?s.inventoryMovements:[],inventoryLots:Array.isArray(s.inventoryLots)?s.inventoryLots:store.state.inventoryLots||[],nextCustomer:Number(s.nextCustomer)||1,nextTransaction:Number(s.nextTransaction)||1,settings};}
-function newUser(name,username,password,role){const p=passwordHash(password);return{id:crypto.randomUUID(),username,name,role,salt:p.salt,passwordHash:p.hash,active:true,mustChangePassword:role==="employee",twoFactorEnabled:false,permissions:role==="manager"?[]:["customers:create","transactions:create","transactions:cancel","inventory:view","inventory:edit","reports:view","vault:view","vault:edit"],createdAt:new Date().toISOString()};}
+function newUser(name,username,password,role,branchId=DEFAULT_BRANCH_ID){const p=passwordHash(password);return{id:crypto.randomUUID(),username,name,role,salt:p.salt,passwordHash:p.hash,active:true,mustChangePassword:role==="employee",twoFactorEnabled:false,branchId,permissions:role==="manager"?[]:["customers:create","transactions:create","transactions:cancel","inventory:view","inventory:edit","reports:view","vault:view","vault:edit"],createdAt:new Date().toISOString()};}
 function log(user,action,details={}){store.audit.push({id:crypto.randomUUID(),date:new Date().toISOString(),userId:user?.id||null,userName:user?.name||"النظام",action,details});if(store.audit.length>20000)store.audit=store.audit.slice(-20000);}
 function createAlert(type,title,message,details={},audience="manager",dedupeKey="") {if(dedupeKey&&store.alerts.some(a=>a.dedupeKey===dedupeKey&&!a.resolvedAt))return null;const alert={id:crypto.randomUUID(),type,title,message,details,audience,dedupeKey,createdAt:new Date().toISOString(),reviewedAt:null,reviewedBy:null,resolvedAt:null};store.alerts.push(alert);if(store.alerts.length>10000)store.alerts=store.alerts.slice(-10000);log(null,"تنبيه آلي",{type,title,details});return alert;}
 function alertForStock(item){const active=Number(item.quantity)<=Number(item.minimum||0),key=`stock:${item.id}`;if(active)createAlert("stock-low","مخزون منخفض",`الصنف ${item.name} وصل إلى حد التنبيه أو أقل.`,{itemId:item.id,quantity:item.quantity,minimum:item.minimum},"manager",key);else for(const a of store.alerts)if(a.dedupeKey===key&&!a.resolvedAt)a.resolvedAt=new Date().toISOString();}
@@ -135,7 +177,12 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==="POST"&&url.pathname==="/api/two-factor/setup"){const u=requireUser(req,res);if(!u)return;if(u.twoFactorEnabled)return json(res,409,{error:"التحقق بخطوتين مفعّل بالفعل. أدخل رمزًا صالحًا لإيقافه أولًا."});const secret=crypto.randomBytes(20).toString("hex");u.twoFactorPendingSecret=sealSecret(secret);persist();const alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";let bits="";for(const byte of Buffer.from(secret,"hex"))bits+=byte.toString(2).padStart(8,"0");let base32="";for(let i=0;i<bits.length;i+=5)base32+=alphabet[parseInt(bits.slice(i,i+5).padEnd(5,"0"),2)];const uri=`otpauth://totp/${encodeURIComponent(`GoldAccounts:${u.username}`)}?secret=${base32}&issuer=GoldAccounts&digits=6&period=30`;return json(res,200,{secret:base32,uri});}
   if(req.method==="POST"&&url.pathname==="/api/two-factor/confirm"){const u=requireUser(req,res);if(!u)return;if(!u.twoFactorPendingSecret||!verifyTotp(openSecret(u.twoFactorPendingSecret),(await readBody(req)).code))return json(res,400,{error:"رمز التحقق غير صحيح. راجع الوقت والرمز في تطبيق المصادقة."});u.twoFactorSecret=u.twoFactorPendingSecret;delete u.twoFactorPendingSecret;u.twoFactorEnabled=true;log(u,"تفعيل التحقق بخطوتين");persist();return json(res,200,{ok:true,user:userView(u)});}
   if(req.method==="POST"&&url.pathname==="/api/two-factor/disable"){const u=requireUser(req,res);if(!u)return;const b=await readBody(req);if(!u.twoFactorEnabled||!verifyTotp(openSecret(u.twoFactorSecret),b.code))return json(res,400,{error:"رمز التحقق غير صحيح."});u.twoFactorEnabled=false;delete u.twoFactorSecret;delete u.twoFactorPendingSecret;log(u,"إيقاف التحقق بخطوتين");persist();return json(res,200,{ok:true});}
-  if(req.method==="GET"&&url.pathname==="/api/state"){const u=requireUser(req,res);if(!u)return;const state={...store.state};if(!hasPermission(u,"inventory:view")){state.inventoryItems=[];state.inventoryMovements=[];state.serialPieces=[];}else state.serialPieces=u.role==="manager"?store.pieces:store.pieces.map(({unitCost,unitMakingCost,...piece})=>piece);if(u.role!=="manager")state.inventoryLots=[];return json(res,200,{...state,version:store.version,user:userView(u)});}
+  if(req.method==="GET"&&url.pathname==="/api/state"){const u=requireUser(req,res);if(!u)return;
+  const branchId=resolveUserBranch(u,url);
+  const state=stateForBranch(branchId);
+  if(!hasPermission(u,"inventory:view")){state.inventoryItems=[];state.inventoryMovements=[];state.serialPieces=[];}else{const pieceBranchId=branchId==="all"?null:branchId;state.serialPieces=(pieceBranchId?store.pieces.filter(p=>p.branchId===pieceBranchId||!p.branchId):store.pieces).map(p=>u.role==="manager"?p:({...p,unitCost:undefined,unitMakingCost:undefined}));}
+  if(u.role!=="manager")state.inventoryLots=[];
+  return json(res,200,{...state,version:store.version,user:userView(u),branchId,branches:u.role==="manager"?store.branches:store.branches.filter(b=>b.id===u.branchId||b.id===DEFAULT_BRANCH_ID).filter(b=>b.active)});}
   m=url.pathname.match(/^\/api\/inventory-lots\/([\w-]+)\/cost$/);if(req.method==="PUT"&&m){const u=requireUser(req,res,"manager");if(!u)return;const b=await readBody(req),lot=store.state.inventoryLots.find(x=>x.id===m[1]),unitCost=Number(b.unitCost),unitMakingCost=Number(b.unitMakingCost??0);if(!lot)return json(res,404,{error:"دفعة المخزون غير موجودة."});if(lot.unitCost!=null)return json(res,409,{error:"توجد تكلفة محفوظة لهذه الدفعة ولا يمكن استبدالها من هذا الإجراء."});if(Number(lot.quantityRemaining)<=0)return json(res,409,{error:"لا توجد كمية متبقية لتسجيل تكلفة افتتاحية لها."});if(!Number.isFinite(unitCost)||unitCost<0||!Number.isFinite(unitMakingCost)||unitMakingCost<0)return json(res,400,{error:"أدخل تكلفة شراء وتصنيع غير سالبتين."});lot.unitCost=unitCost;lot.unitMakingCost=unitMakingCost;lot.costSetAt=new Date().toISOString();lot.costSetBy={id:u.id,name:u.name};log(u,"تسجيل تكلفة افتتاحية لدفعة مخزون",{lotId:lot.id,itemId:lot.itemId,remaining:lot.quantityRemaining,unitCost,unitMakingCost});store.version++;persist();return json(res,200,{lot,version:store.version});}
   if(req.method==="GET"&&url.pathname==="/api/vault"){
    const u=requireUser(req,res);if(!u)return;if(!hasPermission(u,"vault:view"))return json(res,403,{error:"لا يملك حسابك صلاحية عرض مطابقة الخزنة."});
@@ -170,7 +217,23 @@ const server=http.createServer(async(req,res)=>{
   m=url.pathname.match(/^\/api\/cash-close\/([\w-]+)$/);if(req.method==="PATCH"&&m){const manager=requireUser(req,res,"manager");if(!manager)return;const closing=store.cashClosings.find(c=>c.id===m[1]);if(!closing)return json(res,404,{error:"إقفال النقدية غير موجود."});const b=await readBody(req);if(b.action==="approve"&&closing.status==="submitted"){closing.status="approved";closing.approvedAt=new Date().toISOString();closing.approvedBy={id:manager.id,name:manager.name};log(manager,"اعتماد إقفال نقدية يومي",{date:closing.date,difference:closing.difference});}else if(b.action==="reopen"&&closing.status==="approved"){closing.status="reopened";closing.reopenedAt=new Date().toISOString();closing.reopenedBy={id:manager.id,name:manager.name};log(manager,"إعادة فتح إقفال نقدية يومي",{date:closing.date,difference:closing.difference});}else return json(res,409,{error:"لا يمكن تنفيذ الإجراء على حالة الإقفال الحالية."});store.version++;persist();return json(res,200,{closing,version:store.version});}
   if(req.method==="PUT"&&url.pathname==="/api/state"){
    const u=requireUser(req,res);if(!u)return;const b=await readBody(req),version=Number(b.version);if(version!==store.version)return json(res,409,{error:"حُفظت تغييرات من مستخدم آخر. حدّث الصفحة قبل المتابعة.",version:store.version});
-   const old=store.state,next=cleanState(b.state),oldCustomers=new Map(old.customers.map(x=>[x.id,x])),oldTx=new Map(old.transactions.map(x=>[x.id,x])),oldItems=new Map(old.inventoryItems.map(x=>[x.id,x]));
+   const activeBranchId=b.branchId||(u.branchId||DEFAULT_BRANCH_ID);
+   const activeBranch=store.branches.find(x=>x.id===activeBranchId&&x.active);
+   if(!activeBranch)return json(res,400,{error:"الفرع المحدد غير موجود أو غير نشط."});
+   if(u.role!=="manager"&&u.branchId!==activeBranchId)return json(res,403,{error:"لا يمكنك تعديل بيانات فرع آخر."});
+   const old=store.state,next=cleanState(b.state),oldCustomers=new Map(old.customers.filter(c=>c.branchId===activeBranchId).map(x=>[x.id,x])),oldTx=new Map(old.transactions.filter(t=>t.branchId===activeBranchId).map(x=>[x.id,x])),oldItems=new Map(old.inventoryItems.filter(i=>i.branchId===activeBranchId).map(x=>[x.id,x]));
+   // Strip foreign-branch records from next so they can't be tampered with
+   const otherCustomers=old.customers.filter(c=>c.branchId!==activeBranchId);
+   const otherTx=old.transactions.filter(t=>t.branchId!==activeBranchId);
+   const otherItems=old.inventoryItems.filter(i=>i.branchId!==activeBranchId);
+   const otherMovements=old.inventoryMovements.filter(m=>m.branchId!==activeBranchId);
+   const otherLots=old.inventoryLots.filter(l=>l.branchId!==activeBranchId);
+   // Ensure new records inherit the correct branchId
+   next.customers=next.customers.map(c=>c.branchId&&c.branchId!==activeBranchId?c:{...c,branchId:activeBranchId});
+   next.transactions=next.transactions.map(t=>t.branchId&&t.branchId!==activeBranchId?t:{...t,branchId:activeBranchId});
+   next.inventoryItems=next.inventoryItems.map(i=>i.branchId&&i.branchId!==activeBranchId?i:{...i,branchId:activeBranchId});
+   next.inventoryMovements=next.inventoryMovements.map(m=>m.branchId&&m.branchId!==activeBranchId?m:{...m,branchId:activeBranchId});
+   next.inventoryLots=(next.inventoryLots||[]).map(l=>l.branchId&&l.branchId!==activeBranchId?l:{...l,branchId:activeBranchId});
    if(u.role!=="manager"){const oldLotIds=new Set((old.inventoryLots||[]).map(x=>x.id));next.inventoryLots=[...(old.inventoryLots||[]),...(next.inventoryLots||[]).filter(x=>!oldLotIds.has(x.id))];}
    if(u.role!=="manager"){
     if(JSON.stringify(next.settings)!==JSON.stringify(old.settings))return json(res,403,{error:"إعدادات الفرع والتسعير للمدير فقط."});
@@ -251,7 +314,13 @@ const server=http.createServer(async(req,res)=>{
    for(const sale of pendingPieceSales){const piece=store.pieces.find(x=>x.id===sale.pieceId),customer=next.customers.find(x=>x.id===sale.customerId);piece.status="sold";piece.soldAt=new Date().toISOString();piece.soldTo=customer?.name||"";piece.soldToCustomerId=sale.customerId||"";piece.transactionId=sale.transactionId;piece.history.push({type:"sold",at:piece.soldAt,by:{id:u.id,name:u.name},customerName:piece.soldTo,transactionId:sale.transactionId,number:sale.number});log(u,"بيع قطعة مسلسلة",{pieceId:piece.id,serial:piece.serial,transactionId:sale.transactionId});}
    for(const sale of pendingPieceReturns){const piece=store.pieces.find(x=>x.id===sale.pieceId);if(piece&&piece.status==="sold"){piece.status="return-pending";piece.history.push({type:"return-requested",at:new Date().toISOString(),by:{id:u.id,name:u.name},transactionId:sale.transactionId,reason:sale.reason});createAlert("piece-return","اعتماد إرجاع قطعة مسلسلة","أُلغيت فاتورة مرتبطة بالقطعة "+piece.serial+"؛ اعتمد الإرجاع قبل إتاحتها.",{pieceId:piece.id,transactionId:sale.transactionId},"manager","piece-return:"+piece.id+":"+sale.transactionId);}}
    next.inventoryLots=workingLots;
-   next.inventoryItems=next.inventoryItems.map(item=>{if(!oldItems.has(item.id)){log(u,"إضافة صنف للمخزون",{itemId:item.id,name:item.name});return{...item,createdBy:{id:u.id,name:u.name}};}return item;});
+   next.inventoryItems=next.inventoryItems.map(item=>{if(!oldItems.has(item.id)){log(u,"إضافة صنف للمخزون",{itemId:item.id,name:item.name,branchId:activeBranchId});return{...item,createdBy:{id:u.id,name:u.name}};}return item;});
+   // Re-merge other branches' records back in
+   next.customers=[...otherCustomers,...next.customers];
+   next.transactions=[...otherTx,...next.transactions];
+   next.inventoryItems=[...otherItems,...next.inventoryItems];
+   next.inventoryMovements=[...otherMovements,...next.inventoryMovements];
+   next.inventoryLots=[...otherLots,...next.inventoryLots];
    for(const tx of newTransactions){if(tx.type==="reversal")continue;const localDate=new Date(tx.date||Date.now()),time=String(localDate.getHours()).padStart(2,"0")+":"+String(localDate.getMinutes()).padStart(2,"0"),settings=next.settings;if(time<settings.workStart||time>settings.workEnd)createAlert("after-hours","حركة خارج ساعات العمل","سُجّلت حركة "+tx.number+" خارج ساعات العمل المحددة.",{transactionId:tx.id,number:tx.number,time,employee:u.name},"manager","after-hours:"+tx.id);const lineValue=(tx.items||[]).reduce((s,x)=>s+(Number(x.total)||0),0);const derivedDiscount=lineValue>Number(tx.amount||0)?(lineValue-Number(tx.amount||0))*100/lineValue:0;const discount=Math.max(Number(tx.discountPercent)||0,derivedDiscount);if(discount>Number(settings.anomalyDiscountPercent??15))createAlert("large-discount","خصم مرتفع","خصم "+discount.toFixed(2)+"% على الحركة "+tx.number+".",{transactionId:tx.id,percent:Number(discount.toFixed(2)),employee:u.name},"manager","discount:"+tx.id);}
    for(const item of next.inventoryItems){const before=oldItems.get(item.id);if(!before||Number(before.quantity)!==Number(item.quantity))alertForStock(item);}
    store.state=next;store.version++;persist();stateSaveRollback=null;const committed={inventoryItems:next.inventoryItems,inventoryMovements:next.inventoryMovements};if(u.role==="manager")committed.inventoryLots=next.inventoryLots;return json(res,200,{version:store.version,state:committed});
@@ -259,14 +328,23 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==="GET"&&url.pathname==="/api/advanced"){
    const u=requireUser(req,res);if(!u)return;const alertCount=store.alerts.length;runOperationalAlerts();if(store.alerts.length!==alertCount)persist();const from=url.searchParams.get("from"),to=url.searchParams.get("to"),prices=store.goldPriceHistory.filter(x=>(!from||x.at.slice(0,10)>=from)&&(!to||x.at.slice(0,10)<=to));
    const canSeeInventory=hasPermission(u,"inventory:view"),manager=u.role==="manager";
-   const transactionById=new Map(store.state.transactions.map(t=>[t.id,t]));
-   const reorder=canSeeInventory?store.state.inventoryItems.map(item=>({...item,...reorderSuggestion({quantity:item.quantity,minimum:item.minimum,movements:store.state.inventoryMovements.filter(m=>m.itemId===item.id&&m.transactionId&&transactionById.get(m.transactionId)?.type==="sell"&&transactionById.get(m.transactionId)?.status!=="cancelled"),periodDays:store.state.settings.reorderPeriodDays,leadDays:store.state.settings.reorderLeadDays,safetyDays:store.state.settings.reorderSafetyDays})})):[];
+   const branchId=resolveUserBranch(u,url);
+   const bf=branchFilter(branchId);
+   const branchItems=store.state.inventoryItems.filter(bf),branchMovements=store.state.inventoryMovements.filter(bf),branchTx=store.state.transactions.filter(bf);
+   const transactionById=new Map(branchTx.map(t=>[t.id,t]));
+   const reorder=canSeeInventory?branchItems.map(item=>({...item,...reorderSuggestion({quantity:item.quantity,minimum:item.minimum,movements:branchMovements.filter(m=>m.itemId===item.id&&m.transactionId&&transactionById.get(m.transactionId)?.type==="sell"&&transactionById.get(m.transactionId)?.status!=="cancelled"),periodDays:store.state.settings.reorderPeriodDays,leadDays:store.state.settings.reorderLeadDays,safetyDays:store.state.settings.reorderSafetyDays})})):[];
    const alerts=store.alerts.filter(a=>a.audience==="all"||manager).slice(-500).reverse();
-   const pieces=canSeeInventory?(manager?store.pieces:store.pieces.map(({unitCost,unitMakingCost,...piece})=>piece)):[];
-   return json(res,200,{goldPriceHistory:prices.slice(-3000),alerts,pieces,manufacturingOrders:manager?store.manufacturingOrders:[],pledges:manager?store.pledges:[],reorder,backupStatus:manager?store.backupStatus:null,settings:manager?store.state.settings:null,user:userView(u)});
+   const pieceBranchId=branchId==="all"?null:branchId;
+   const allPieces=pieceBranchId?store.pieces.filter(p=>p.branchId===pieceBranchId||!p.branchId):store.pieces;
+   const pieces=canSeeInventory?(manager?allPieces:allPieces.map(({unitCost,unitMakingCost,...piece})=>piece)):[];
+   return json(res,200,{goldPriceHistory:prices.slice(-3000),alerts,pieces,manufacturingOrders:manager?store.manufacturingOrders:[],pledges:manager?store.pledges:[],reorder,backupStatus:manager?store.backupStatus:null,settings:manager?store.state.settings:null,user:userView(u),branchId,branches:manager?store.branches:store.branches.filter(b=>b.active)});
   }
   if(req.method==="GET"&&url.pathname==="/api/profit-report"){
-   const manager=requireUser(req,res,"manager");if(!manager)return;const from=url.searchParams.get("from"),to=url.searchParams.get("to"),sales=store.state.transactions.filter(t=>t.type==="sell"&&t.status!=="cancelled"&&(!from||t.date.slice(0,10)>=from)&&(!to||t.date.slice(0,10)<=to));const rows=sales.map(t=>({id:t.id,number:t.number,date:t.date,employee:t.createdBy?.name||"غير معروف",customer:store.state.customers.find(c=>c.id===t.customerId)?.name||"عميل غير معروف",...transactionProfit(t)}));return json(res,200,{rows,eligibleProfit:Number(rows.filter(x=>x.eligible).reduce((s,x)=>s+x.profit,0).toFixed(2)),eligibleCount:rows.filter(x=>x.eligible).length,unverifiedCount:rows.filter(x=>!x.eligible).length});
+   const manager=requireUser(req,res,"manager");if(!manager)return;
+   const branchId=resolveUserBranch(manager,url);
+   const bf=branchFilter(branchId);
+   const from=url.searchParams.get("from"),to=url.searchParams.get("to"),sales=store.state.transactions.filter(t=>bf(t)&&t.type==="sell"&&t.status!=="cancelled"&&(!from||t.date.slice(0,10)>=from)&&(!to||t.date.slice(0,10)<=to));
+   const rows=sales.map(t=>({id:t.id,number:t.number,date:t.date,employee:t.createdBy?.name||"غير معروف",customer:store.state.customers.find(c=>c.id===t.customerId)?.name||"عميل غير معروف",branchId:t.branchId,...transactionProfit(t)}));return json(res,200,{rows,eligibleProfit:Number(rows.filter(x=>x.eligible).reduce((s,x)=>s+x.profit,0).toFixed(2)),eligibleCount:rows.filter(x=>x.eligible).length,unverifiedCount:rows.filter(x=>!x.eligible).length,branchId});
   }
   if(req.method==="PUT"&&url.pathname==="/api/advanced-settings"){
    const manager=requireUser(req,res,"manager");if(!manager)return;const b=await readBody(req),current=store.state.settings,keys={idleTimeoutMinutes:[5,720],goldAlertThresholdPercent:[.1,100],goldAlertWindowMinutes:[1,1440],reorderPeriodDays:[1,365],reorderLeadDays:[0,365],reorderSafetyDays:[0,365],pledgeReminderDays:[0,365],pledgeFeePercent:[0,100],anomalyCancelCount:[2,100],anomalyCancelMinutes:[1,1440],anomalyDiscountPercent:[0,100]};for(const[key,[min,max]]of Object.entries(keys)){if(b[key]!==undefined){const n=Number(b[key]);if(!Number.isFinite(n)||n<min||n>max)return json(res,400,{error:`قيمة الإعداد ${key} خارج النطاق المسموح.`});current[key]=n;}}for(const key of ["workStart","workEnd"]){if(b[key]!==undefined){if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(b[key])))return json(res,400,{error:"أدخل وقتًا صالحًا بصيغة ساعة:دقيقة."});current[key]=String(b[key]);}}store.version++;log(manager,"تحديث إعدادات التنبيهات والأمان والتحليلات",b);persist();return json(res,200,{settings:current,version:store.version});
@@ -308,10 +386,52 @@ const server=http.createServer(async(req,res)=>{
    const u=requireUser(req,res);if(!u)return;
    const s=store.state.settings||{};return json(res,200,{branchName:s.branchName||"الفرع الرئيسي",brand:cleanPrintBrand(s.printBrand)});
   }
+  // ── Branches API ──────────────────────────────────────────────────────────
+  if(req.method==="GET"&&url.pathname==="/api/branches"){
+    const u=requireUser(req,res);if(!u)return;
+    const visible=u.role==="manager"?store.branches:store.branches.filter(b=>b.active);
+    return json(res,200,{branches:visible});
+  }
+  if(req.method==="POST"&&url.pathname==="/api/branches"){
+    const manager=requireUser(req,res,"manager");if(!manager)return;
+    const b=await readBody(req),name=String(b.name||"").trim(),address=String(b.address||"").trim(),phone=String(b.phone||"").trim();
+    if(name.length<2||name.length>100)return json(res,400,{error:"أدخل اسم فرع بين 2 و 100 حرف."});
+    if(store.branches.some(x=>x.name===name))return json(res,409,{error:"يوجد فرع بهذا الاسم بالفعل."});
+    const branch={id:crypto.randomUUID(),name,address,phone,active:true,createdAt:new Date().toISOString(),createdBy:{id:manager.id,name:manager.name}};
+    store.branches.push(branch);log(manager,"إضافة فرع",{branchId:branch.id,name});store.version++;persist();
+    return json(res,201,{branch});
+  }
+  m=url.pathname.match(/^\/api\/branches\/([\w-]+)$/);if(req.method==="PATCH"&&m){
+    const manager=requireUser(req,res,"manager");if(!manager)return;
+    const branch=store.branches.find(x=>x.id===m[1]);if(!branch)return json(res,404,{error:"الفرع غير موجود."});
+    if(branch.id===DEFAULT_BRANCH_ID&&b?.active===false)return json(res,400,{error:"لا يمكن تعطيل الفرع الرئيسي."});
+    const b=await readBody(req);
+    if(b.name!==undefined){const n=String(b.name).trim();if(n.length<2||n.length>100)return json(res,400,{error:"اسم الفرع غير صالح."});if(store.branches.some(x=>x.id!==branch.id&&x.name===n))return json(res,409,{error:"اسم الفرع مستخدم بالفعل."});branch.name=n;}
+    if(b.address!==undefined)branch.address=String(b.address).trim().slice(0,300);
+    if(b.phone!==undefined)branch.phone=String(b.phone).trim().slice(0,40);
+    if(b.active!==undefined)branch.active=!!b.active;
+    log(manager,"تعديل فرع",{branchId:branch.id,name:branch.name});store.version++;persist();
+    return json(res,200,{branch});
+  }
+  // Assign user to branch
+  m=url.pathname.match(/^\/api\/users\/([\w-]+)\/branch$/);if(req.method==="PUT"&&m){
+    const manager=requireUser(req,res,"manager");if(!manager)return;
+    const b=await readBody(req),target=store.users.find(u=>u.id===m[1]);
+    if(!target)return json(res,404,{error:"المستخدم غير موجود."});
+    const branch=store.branches.find(x=>x.id===b.branchId&&x.active);
+    if(!branch)return json(res,404,{error:"الفرع المحدد غير موجود أو غير نشط."});
+    target.branchId=branch.id;log(manager,"تغيير فرع موظف",{userId:target.id,branchId:branch.id,branchName:branch.name});persist();
+    return json(res,200,{ok:true,branchId:branch.id});
+  }
+  // ── End Branches API ──────────────────────────────────────────────────────
   if(req.method==="GET"&&url.pathname==="/api/users"){const u=requireUser(req,res,"manager");if(!u)return;return json(res,200,{users:store.users.map(userView)});}
   if(req.method==="POST"&&url.pathname==="/api/users"){
    const manager=requireUser(req,res,"manager");if(!manager)return;const b=await readBody(req),username=String(b.username||"").trim();if(!/^[\p{L}\p{N}_.-]{3,40}$/u.test(username)||String(b.name||"").trim().length<2||String(b.password||"").length<10)return json(res,400,{error:"أدخل اسم مستخدم صالحًا، واسمًا لا يقل عن حرفين، وكلمة مرور من 10 أحرف على الأقل."});
-   if(store.users.some(u=>u.username===username))return json(res,409,{error:"اسم المستخدم مستخدم بالفعل."});const u=newUser(String(b.name).trim(),username,String(b.password),"employee");store.users.push(u);log(manager,"إنشاء حساب موظف",{userId:u.id,username:u.username});persist();return json(res,201,{user:userView(u)});
+   if(store.users.some(u=>u.username===username))return json(res,409,{error:"اسم المستخدم مستخدم بالفعل."});
+   const newBranchId=String(b.branchId||DEFAULT_BRANCH_ID);
+   const targetBranch=store.branches.find(x=>x.id===newBranchId&&x.active);
+   if(!targetBranch)return json(res,400,{error:"الفرع المحدد غير موجود أو غير نشط."});
+   const u=newUser(String(b.name).trim(),username,String(b.password),"employee",newBranchId);store.users.push(u);log(manager,"إنشاء حساب موظف",{userId:u.id,username:u.username,branchId:newBranchId});persist();return json(res,201,{user:userView(u)});
   }
   m=url.pathname.match(/^\/api\/users\/([\w-]+)\/active$/);if(req.method==="PATCH"&&m){const manager=requireUser(req,res,"manager");if(!manager)return;const b=await readBody(req),target=store.users.find(u=>u.id===m[1]);if(!target||target.role!=="employee")return json(res,404,{error:"الموظف غير موجود."});target.active=!!b.active;if(!target.active)for(const[token,session]of sessions)if(session.userId===target.id)sessions.delete(token);log(manager,target.active?"تفعيل حساب موظف":"تعطيل حساب موظف",{userId:target.id,username:target.username});persist();return json(res,200,{ok:true});}
   m=url.pathname.match(/^\/api\/users\/([\w-]+)\/password$/);if(req.method==="PUT"&&m){const manager=requireUser(req,res,"manager");if(!manager)return;const b=await readBody(req),target=store.users.find(u=>u.id===m[1]);if(!target||target.role!=="employee")return json(res,404,{error:"الموظف غير موجود."});if(String(b.password||"").length<10)return json(res,400,{error:"كلمة المرور يجب أن تكون 10 أحرف على الأقل."});const p=passwordHash(String(b.password));target.salt=p.salt;target.passwordHash=p.hash;target.mustChangePassword=true;for(const[token,session]of sessions)if(session.userId===target.id)sessions.delete(token);log(manager,"إعادة تعيين كلمة مرور موظف",{userId:target.id,username:target.username});persist();return json(res,200,{ok:true});}

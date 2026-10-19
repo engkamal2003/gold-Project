@@ -32,6 +32,7 @@
       <button class="nav-btn" data-view="vault" data-permission="vault:view">◉ <span>مطابقة الخزنة</span></button>
       <button class="nav-btn" data-view="reports" data-permission="reports:view">▤ <span>التقارير</span></button>
       <button class="nav-btn" data-view="backup">⇩ <span>النسخ الاحتياطي</span></button>
+      <button class="nav-btn manager-only" data-view="branches" hidden>⑃ <span>الفروع</span></button>
       <button class="nav-btn manager-only" data-view="users" hidden>♙ <span>المستخدمون</span></button>
       <button class="nav-btn manager-only" data-view="audit" hidden>◷ <span>سجل التدقيق</span></button>
       <button class="nav-btn manager-only" data-view="settings" hidden>⚙ <span>الإعدادات</span></button>
@@ -40,7 +41,7 @@
   </aside>
 
   <main class="main">
-    <header class="topbar"><div><div class="eyebrow">نظام إدارة الحسابات</div><h1 id="page-title">لوحة التحكم</h1></div><div class="topbar-tools"><div class="today" id="today"></div><span id="current-user"></span><button id="change-password-btn" class="secondary">كلمة المرور</button><button id="logout-btn" class="secondary">تسجيل الخروج</button></div></header>
+    <header class="topbar"><div><div class="eyebrow">نظام إدارة الحسابات</div><h1 id="page-title">لوحة التحكم</h1></div><div class="topbar-tools"><div class="today" id="today"></div><span id="current-user"></span><span id="branch-active-name" class="branch-badge"></span><div id="branch-selector-wrap" class="branch-selector-wrap" hidden><label for="branch-selector" class="sr-only">الفرع</label><select id="branch-selector" class="branch-selector"></select></div><button id="change-password-btn" class="secondary">كلمة المرور</button><button id="logout-btn" class="secondary">تسجيل الخروج</button></div></header>
 
     <section class="view active" id="view-dashboard">
       <div class="welcome"><div><h2>مرحبًا بك</h2><p>تابع أرصدة العملاء المالية والذهبية من مكان واحد.</p></div><button class="primary" data-goto="transaction">＋ تسجيل حركة جديدة</button></div>
@@ -267,17 +268,31 @@
       </div>
       <div class="notice"><strong>مهم:</strong> البيانات تحفظ في قاعدة على الكمبيوتر المستضيف. احتفظ بنسخ احتياطية خارج هذا الكمبيوتر. لا تفتح الاتصال غير المشفر على الإنترنت.</div>
     </section>
+    <section class="view" id="view-branches">
+      <div class="panel"><div class="panel-head"><div><h3>إضافة فرع جديد</h3><p>كل فرع له رصيد عملاء ومخزون مستقل.</p></div></div>
+        <form id="add-branch-form" class="form-grid">
+          <label>اسم الفرع *<input name="name" required maxlength="100" placeholder="مثال: فرع المعادي"></label>
+          <label>العنوان<input name="address" maxlength="300" placeholder="اختياري"></label>
+          <label>الهاتف<input name="phone" maxlength="40" placeholder="اختياري"></label>
+          <div class="form-actions"><button class="primary" type="submit">إضافة الفرع</button></div>
+        </form>
+      </div>
+      <div class="panel"><div class="panel-head"><div><h3>الفروع المسجلة</h3><p>يمكن تعطيل فرع دون حذف بياناته.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>اسم الفرع</th><th>العنوان</th><th>الهاتف</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody id="branch-management-rows"></tbody></table></div>
+      </div>
+    </section>
     <section class="view" id="view-users">
       <div class="panel"><div class="panel-head"><div><h3>إضافة موظف</h3><p>أنشئ حسابًا مستقلًا لكل موظف.</p></div></div>
         <form id="user-form" class="form-grid">
           <label>اسم الموظف *<input id="user-name" required maxlength="100"></label>
           <label>اسم المستخدم *<input id="user-username" required minlength="3" maxlength="40" autocomplete="off"></label>
           <label>كلمة المرور *<input id="user-password" type="password" required minlength="10" autocomplete="new-password"><small>10 أحرف على الأقل</small></label>
+          <label>الفرع<select id="user-branch"><option value="main">الفرع الرئيسي</option></select></label>
           <div class="form-actions"><button class="primary" type="submit">إنشاء حساب الموظف</button></div>
         </form>
       </div>
       <div class="panel"><div class="panel-head"><div><h3>حسابات المستخدمين</h3><p>يمكن للمدير تعطيل حساب موظف دون حذف سجل عملياته.</p></div></div>
-        <div class="table-wrap"><table><thead><tr><th>الاسم</th><th>اسم المستخدم</th><th>الدور</th><th>الحالة</th><th>إجراءات وصلاحيات</th></tr></thead><tbody id="user-rows"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>الاسم</th><th>اسم المستخدم</th><th>الدور</th><th>الفرع</th><th>الحالة</th><th>إجراءات وصلاحيات</th></tr></thead><tbody id="user-rows"></tbody></table></div>
       </div>
     </section>
     <section class="view" id="view-audit">

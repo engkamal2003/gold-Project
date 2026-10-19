@@ -15,6 +15,7 @@
   let data = { customers: [], transactions: [], inventoryItems:[], inventoryMovements:[], inventoryLots:[], nextCustomer: 1, nextTransaction: 1, settings:{branchName:"الفرع الرئيسي",goldPrice24:0,makingPerGram:0,taxRate:0,buySpreadPerGram:50,bullionCashbackPerGram:0,stampPerGram:13,paymentMethods:[],employeeDaysOff:{},printBrand:{arabicName:"العزيز بالله",englishName:"AL-AZIZ BELLAH",tagline:"JEWELRY",address:"",phones:"",footerNote:"",logoDataUrl:"",qrDataUrl:""}} };
   let goldPriceState={mode:"auto",prices:null,automaticPrices:null,updatedAt:null,error:""},goldPriceLoading=null,goldPriceFormDirty=false;
   let stateVersion = 0, currentUser = null, usersCache = [], savingData = false, auditCache=[],calcLines=[],pendingInvoiceLines=[],paymentMethodEditingId=null,staffRoster=[],staffScheduleDraft={},staffScheduleDirty=false,printBrandDraft=null,printBrandDirty=false,sessionIdleTimeoutMinutes=30,pendingCsvImport=[],pendingCsvImportType="customers";
+  let branchesCache=[], currentBranchId="main";
   const arabicDigits="٠١٢٣٤٥٦٧٨٩";
   function westernDigits(value){return String(value??"").replace(/[٠-٩]/g,c=>String(arabicDigits.indexOf(c))).replace(/[۰-۹]/g,c=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(c)));}
   function importHeaderKey(value){return westernDigits(value).normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670\u0640]/g,"").replace(/[\s_\-./\\()\[\]:]+/g,"").trim();}
@@ -32,7 +33,7 @@
   async function save() {
     savingData=true;
     try {
-      const result=await api("/api/state",{method:"PUT",body:JSON.stringify({version:stateVersion,state:data})});
+      const result=await api("/api/state",{method:"PUT",body:JSON.stringify({version:stateVersion,state:data,branchId:currentBranchId})});
       stateVersion=result.version;if(result.state)data={...data,...result.state};window.dispatchEvent(new CustomEvent("gca:data-saved"));return true;
     } catch(e) {
       if(e.status===409){alert(e.message);location.reload();return false;}
@@ -125,11 +126,19 @@
   }
   function renderAll() { renderCustomerOptions(); renderCustomers(); renderLedger(); renderDashboard(); }
   async function renderUsers() {
+    // fill branch dropdown in user creation form
+    const branchSel=$("user-branch");
+    if(branchSel&&branchesCache.length){
+      const savedVal=branchSel.value;
+      branchSel.innerHTML=branchesCache.filter(b=>b.active).map(b=>`<option value="${esc(b.id)}">${esc(b.name)}</option>`).join("");
+      branchSel.value=savedVal||currentBranchId;
+    }
     if(currentUser?.role!=="manager") return;
     try {
       const result=await api("/api/users"); usersCache=result.users;
       const permissions=[["customers:create","إضافة عملاء"],["transactions:create","تسجيل الحركات"],["transactions:cancel","إلغاء الحركات"],["inventory:view","عرض المخزون"],["inventory:edit","تعديل المخزون"],["reports:view","عرض التقارير"],["backup:export","تصدير نسخة"],["vault:view","عرض مطابقة الخزنة"],["vault:edit","تعديل مطابقة الخزنة"]];
-      $("user-rows").innerHTML=usersCache.map(u=>`<tr><td>${esc(u.name)}</td><td>${esc(u.username)}</td><td>${u.role==="manager"?"مدير":"موظف"}</td><td><span class="pill ${u.active?"":"red"}">${u.active?"نشط":"معطّل"}</span></td><td>${u.role==="employee"?`<div class="row-actions"><button class="small-btn" data-toggle-user="${u.id}" data-active="${u.active}">${u.active?"تعطيل":"تفعيل"}</button><button class="small-btn" data-reset-password="${u.id}">إعادة كلمة المرور</button><details><summary>الصلاحيات</summary><div class="permission-list">${permissions.map(([key,label])=>`<label><input type="checkbox" data-user-permission="${u.id}" value="${key}" ${(u.permissions||[]).includes(key)?"checked":""}> ${label}</label>`).join("")}</div></details></div>`:"—"}</td></tr>`).join("")||`<tr><td colspan="5" class="empty">لا يوجد مستخدمون.</td></tr>`;
+      const branchName=id=>{const b=branchesCache.find(x=>x.id===id);return b?esc(b.name):esc(id||"الرئيسي");};
+      $("user-rows").innerHTML=usersCache.map(u=>`<tr><td>${esc(u.name)}</td><td>${esc(u.username)}</td><td>${u.role==="manager"?"مدير":"موظف"}</td><td>${branchName(u.branchId)}</td><td><span class="pill ${u.active?"":"red"}">${u.active?"نشط":"معطّل"}</span></td><td>${u.role==="employee"?`<div class="row-actions"><button class="small-btn" data-toggle-user="${u.id}" data-active="${u.active}">${u.active?"تعطيل":"تفعيل"}</button><button class="small-btn" data-reset-password="${u.id}">إعادة كلمة المرور</button><details><summary>الصلاحيات</summary><div class="permission-list">${permissions.map(([key,label])=>`<label><input type="checkbox" data-user-permission="${u.id}" value="${key}" ${(u.permissions||[]).includes(key)?"checked":""}> ${label}</label>`).join("")}</div></details></div>`:"—"}</td></tr>`).join("")||`<tr><td colspan="6" class="empty">لا يوجد مستخدمون.</td></tr>`;
     } catch(e) { toast(e.message); }
   }
   function printBrand(){return{arabicName:"العزيز بالله",englishName:"AL-AZIZ BELLAH",tagline:"JEWELRY",address:"",phones:"",footerNote:"",...(data.settings?.printBrand||{})};}
@@ -237,7 +246,7 @@
     paymentMethodEditingId=method.id;$("payment-name").value=method.name||"";$("payment-bank").value=method.bankName||"";$("payment-number").value=method.accountNumber||"";$("payment-beneficiary").value=method.beneficiary||"";$("payment-notes").value=method.notes||"";$("payment-form-title").textContent="تعديل بيانات طريقة الدفع";$("payment-save-btn").textContent="حفظ التعديلات";$("payment-cancel-edit").hidden=false;$("payment-account-editor").scrollIntoView({behavior:"smooth",block:"start"});
   }
   async function renderBackups(){if(currentUser?.role!=="manager")return;try{const files=(await api("/api/backups")).files;$("backup-rows").innerHTML=files.map(f=>`<tr><td>${esc(f.name)}</td><td>${dateText(f.modifiedAt)}</td><td>${(f.size/1024).toFixed(1)} KB</td><td><button class="small-btn" data-restore-backup="${esc(f.name)}">استعادة</button></td></tr>`).join("")||`<tr><td colspan="4" class="empty">لا توجد نسخ محفوظة بعد.</td></tr>`;}catch(e){toast(e.message);}}
-  const titles={dashboard:"لوحة التحكم",customers:"العملاء",transaction:"تسجيل حركة", "gold-calculator":"حاسبة البيع والشراء","payment-accounts":"حسابات التحويل","staff-schedule":"إجازات الموظفين",ledger:"كشف الحركات",inventory:"المخزون",suppliers:"الموردون والمشتريات","cash-close":"إقفال النقدية",vault:"مطابقة الخزنة",reports:"التقارير",backup:"النسخ الاحتياطي",users:"إدارة المستخدمين",audit:"سجل التدقيق",settings:"الإعدادات",analytics:"مؤشرات المدير","customers-analysis":"تحليل العملاء",profit:"الربح الفعلي","price-history":"تاريخ أسعار الذهب",pieces:"القطع المسلسلة",manufacturing:"طلبات التصنيع",pledges:"الرهونات والضمانات",alerts:"مركز التنبيهات",security:"الأمان والصلاحيات"};
+  const titles={dashboard:"لوحة التحكم",customers:"العملاء",transaction:"تسجيل حركة", "gold-calculator":"حاسبة البيع والشراء","payment-accounts":"حسابات التحويل","staff-schedule":"إجازات الموظفين",ledger:"كشف الحركات",inventory:"المخزون",suppliers:"الموردون والمشتريات","cash-close":"إقفال النقدية",vault:"مطابقة الخزنة",reports:"التقارير",backup:"النسخ الاحتياطي",users:"إدارة المستخدمين",audit:"سجل التدقيق",settings:"الإعدادات",analytics:"مؤشرات المدير","customers-analysis":"تحليل العملاء",profit:"الربح الفعلي","price-history":"تاريخ أسعار الذهب",pieces:"القطع المسلسلة",manufacturing:"طلبات التصنيع",pledges:"الرهونات والضمانات",alerts:"مركز التنبيهات",security:"الأمان والصلاحيات",branches:"إدارة الفروع"};
   function showView(name) {
     const nav=document.querySelector(`.nav-btn[data-view="${name}"]`),required=nav?.dataset.permission;
     if(required&&!can(required)){toast("لا يملك حسابك صلاحية فتح هذه الصفحة أو انتهت صلاحيتها.");return;}
@@ -258,6 +267,7 @@
     if(name==="payment-accounts") renderPaymentMethods();
     if(name==="staff-schedule") renderStaffSchedule();
     if(name==="backup") renderBackups();
+    if(name==="branches") renderBranchManagement();
     window.dispatchEvent(new CustomEvent("gca:view",{detail:{name}}));
     window.scrollTo({top:0,behavior:"smooth"});
   }
@@ -572,7 +582,7 @@
   $("user-form").addEventListener("submit",async e=>{
     e.preventDefault();
     try {
-      await api("/api/users",{method:"POST",body:JSON.stringify({name:$("user-name").value.trim(),username:$("user-username").value.trim(),password:$("user-password").value})});
+      await api("/api/users",{method:"POST",body:JSON.stringify({name:$("user-name").value.trim(),username:$("user-username").value.trim(),password:$("user-password").value,branchId:$("user-branch").value||"main"})});
       e.target.reset();await renderUsers();toast("تم إنشاء حساب الموظف.");
     } catch(err) { toast(err.message); }
   });
@@ -635,7 +645,12 @@
     currentUser=user;
     lastHumanActivity=Date.now();
     if(user.mustChangePassword){$("current-user").textContent=`${user.name} — ${user.role==="manager"?"مدير":"موظف"}`;$("auth-screen").hidden=true;openPasswordDialog({title:"تغيير كلمة المرور لأول مرة",current:true,forced:true});return;}
-    const state=await api("/api/state");stateVersion=state.version;data={...data,...state};delete data.version;delete data.user;sessionIdleTimeoutMinutes=Number(data.settings?.idleTimeoutMinutes)||30;
+    currentBranchId=user.branchId||"main";
+    const state=await api("/api/state");stateVersion=state.version;data={...data,...state};
+    if(state.branches)branchesCache=state.branches;
+    if(state.branchId)currentBranchId=state.branchId;
+    delete data.version;delete data.user;delete data.branches;delete data.branchId;
+    sessionIdleTimeoutMinutes=Number(data.settings?.idleTimeoutMinutes)||30;
     $("current-user").textContent=`${user.name} — ${user.role==="manager"?"مدير":"موظف"}`;
     document.querySelectorAll(".manager-only").forEach(el=>{el.hidden=user.role!=="manager";});
     document.querySelectorAll("[data-permission]").forEach(el=>{el.hidden=!can(el.dataset.permission);});
@@ -645,6 +660,7 @@
     $("backup-export-card").hidden=!can("backup:export");
     $("cash-close-form").hidden=!can("vault:edit");
     const vaultFrame=$("view-vault")?.querySelector("iframe");if(vaultFrame&&!vaultFrame.src)vaultFrame.src="/vault/index.html";
+    renderBranchSelector();
     $("auth-screen").hidden=true;updateFields();renderAll();renderGoldPriceCards();loadGoldPrices();window.dispatchEvent(new CustomEvent("gca:session",{detail:{user}}));
   }
   document.addEventListener("gca:serial-pieces",e=>{data.serialPieces=Array.isArray(e.detail)?e.detail:[];});
@@ -655,14 +671,106 @@
   setInterval(async()=>{
     if(!currentUser||savingData||document.hidden)return;
     try {
-      const state=await api("/api/state",{headers:{"X-GCA-Background":"1"}});
-      if(state.version!==stateVersion){stateVersion=state.version;data={...data,...state};delete data.version;delete data.user;renderAll();const active=document.querySelector(".view.active")?.id?.replace("view-","");if(active==="inventory")renderInventory();if(active==="suppliers")renderSuppliers();if(active==="cash-close")renderCashClose();if(active==="reports")renderReports();if(active==="settings")renderSettings();if(active==="gold-calculator")renderGoldCalculator();if(active==="payment-accounts")renderPaymentMethods();if(active==="staff-schedule")renderStaffSchedule();}
+      const state=await api(`/api/state?branchId=${encodeURIComponent(currentBranchId)}`,{headers:{"X-GCA-Background":"1"}});
+      if(state.version!==stateVersion){stateVersion=state.version;data={...data,...state};if(state.branches)branchesCache=state.branches;delete data.version;delete data.user;delete data.branches;delete data.branchId;renderAll();renderBranchSelector();const active=document.querySelector(".view.active")?.id?.replace("view-","");if(active==="inventory")renderInventory();if(active==="suppliers")renderSuppliers();if(active==="cash-close")renderCashClose();if(active==="reports")renderReports();if(active==="settings")renderSettings();if(active==="gold-calculator")renderGoldCalculator();if(active==="payment-accounts")renderPaymentMethods();if(active==="staff-schedule")renderStaffSchedule();}
     } catch(e) { if(e.status===401){currentUser=null;showAuth(false);} }
   },10000);
   async function initialize() {
     try { const result=await api("/api/me");await startSession(result.user); }
     catch { try { const status=await api("/api/status");showAuth(status.setupRequired); } catch(e) { showAuth(false);$("auth-screen").querySelector(".auth-error")?.replaceChildren(document.createTextNode("تعذر الاتصال بالخادم. تأكد من تشغيله ثم أعد تحميل الصفحة.")); } }
   }
+  // ── Branches UI ───────────────────────────────────────────────────────────
+  function renderBranchSelector(){
+    const container=$("branch-selector-wrap");
+    if(!container)return;
+    const isManager=currentUser?.role==="manager";
+    const branches=branchesCache.filter(b=>b.active||(isManager));
+    if(branches.length<=1){container.hidden=true;return;}
+    container.hidden=false;
+    const sel=$("branch-selector");
+    if(!sel)return;
+    const prev=sel.value;
+    sel.innerHTML=`${isManager?'<option value="all">كل الفروع</option>':''}${branches.map(b=>`<option value="${b.id}">${esc(b.name)}</option>`).join("")}`;
+    if(branches.some(b=>b.id===prev)||(isManager&&prev==="all"))sel.value=prev;
+    else sel.value=currentBranchId;
+    const activeName=branches.find(b=>b.id===currentBranchId)?.name||data.settings?.branchName||"الفرع الرئيسي";
+    const label=$("branch-active-name");
+    if(label)label.textContent=activeName;
+  }
+  async function switchBranch(branchId){
+    currentBranchId=branchId;
+    try{
+      const state=await api(`/api/state?branchId=${encodeURIComponent(branchId)}`);
+      stateVersion=state.version;data={...data,...state};
+      if(state.branches)branchesCache=state.branches;
+      delete data.version;delete data.user;delete data.branches;delete data.branchId;
+      renderBranchSelector();renderAll();
+      const active=document.querySelector(".view.active")?.id?.replace("view-","");
+      if(active==="inventory")renderInventory?.();
+      if(active==="reports")renderReports?.();
+    }catch(e){toast(e.message);}
+  }
+  async function renderBranchManagement(){
+    if(currentUser?.role!=="manager")return;
+    const container=$("branch-management-rows");
+    if(!container)return;
+    try{
+      const result=await api("/api/branches");branchesCache=result.branches;
+      container.innerHTML=branchesCache.map(b=>`<tr>
+        <td>${esc(b.name)}</td>
+        <td>${esc(b.address||"—")}</td>
+        <td>${esc(b.phone||"—")}</td>
+        <td><span class="pill ${b.active?"":"red"}">${b.active?"نشط":"معطّل"}</span></td>
+        <td class="row-actions">
+          <button class="small-btn" data-edit-branch="${b.id}">تعديل</button>
+          ${b.id!=="main"?`<button class="small-btn" data-toggle-branch="${b.id}" data-active="${b.active}">${b.active?"تعطيل":"تفعيل"}</button>`:""}
+        </td>
+      </tr>`).join("")||`<tr><td colspan="5" class="empty">لا توجد فروع.</td></tr>`;
+      renderBranchSelector();
+    }catch(e){toast(e.message);}
+  }
+  document.addEventListener("click",async e=>{
+    const editBtn=e.target.closest("[data-edit-branch]");
+    if(editBtn){
+      const id=editBtn.dataset.editBranch;
+      const branch=branchesCache.find(b=>b.id===id);
+      if(!branch)return;
+      const name=prompt("اسم الفرع:",branch.name);if(!name||!name.trim())return;
+      const address=prompt("العنوان (اختياري):",branch.address||"");
+      const phone=prompt("الهاتف (اختياري):",branch.phone||"");
+      try{await api(`/api/branches/${id}`,{method:"PATCH",body:JSON.stringify({name:name.trim(),address:(address||"").trim(),phone:(phone||"").trim()})});await renderBranchManagement();toast("تم تحديث الفرع.");}
+      catch(err){toast(err.message);}
+      return;
+    }
+    const toggleBtn=e.target.closest("[data-toggle-branch]");
+    if(toggleBtn){
+      const id=toggleBtn.dataset.toggleBranch,active=toggleBtn.dataset.active==="true";
+      if(!confirm(`هل تريد ${active?"تعطيل":"تفعيل"} هذا الفرع؟`))return;
+      try{await api(`/api/branches/${id}`,{method:"PATCH",body:JSON.stringify({active:!active})});await renderBranchManagement();toast("تم تحديث حالة الفرع.");}
+      catch(err){toast(err.message);}
+    }
+  });
+  const addBranchForm=$("add-branch-form");
+  if(addBranchForm){
+    addBranchForm.addEventListener("submit",async e=>{
+      e.preventDefault();
+      const f=new FormData(e.target);
+      const name=String(f.get("name")||"").trim();
+      const address=String(f.get("address")||"").trim();
+      const phone=String(f.get("phone")||"").trim();
+      if(name.length<2)return toast("أدخل اسمًا للفرع (حرفان على الأقل).");
+      try{
+        const result=await api("/api/branches",{method:"POST",body:JSON.stringify({name,address,phone})});
+        branchesCache.push(result.branch);e.target.reset();
+        await renderBranchManagement();toast("تم إضافة الفرع بنجاح.");
+      }catch(err){toast(err.message);}
+    });
+  }
+  const branchSel=$("branch-selector");
+  if(branchSel){
+    branchSel.addEventListener("change",()=>switchBranch(branchSel.value));
+  }
+  // ── End Branches UI ───────────────────────────────────────────────────────
   buildCalcProductOptions();
   $("today").textContent=new Date().toLocaleDateString("ar-EG",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
   initialize();
